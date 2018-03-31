@@ -1,0 +1,19 @@
+[package]
+name = "Prácticas"
+version = "0.1.0"
+authors = ["José Manuel Muñoz Fuentes <jmlosvillares@correo.ugr.es>"]
+
+[dependencies]
+itertools = "0.7.7"
+ordered-float = "0.5.0"
+rand = "0.4"
+time = "*"
+clap = "2.31.2"
+byteorder = "1.2.1"
+
+[profile.release]
+lto = true
+
+[[bin]]
+name = "practica1"
+path = "src/practica1.rs"
