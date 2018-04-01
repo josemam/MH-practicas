@@ -57,13 +57,29 @@ const MAX_CICLOS: usize = 20;          // Tope de veces que se explorará cada a
 //   en evaluacion_pesos.rs se usa un tipo de RNG particular para probarlos
 
 
-// Ejecuta búsqueda local de soluciones con el procedimiento descrito en el guion
+// Combina un algoritmo de búsqueda de soluciones con otro que consista en una búsqueda local
+// Concretamente, aplica la búsqueda local indicada al resultado del primero algoritmo
+// Por ejemplo, se puede usar para aplicar una búsqueda local a partir de una solución aleatoria,
+//   o a partir del resultado de RELIEF
+pub fn combinar<Trng: Rng>(entrenamiento: &[Dato], algoritmo_1: &Fn(&[Dato], &mut Trng) -> Vec<f64>, algoritmo_bl: &Fn(&[Dato], &[f64], &mut Trng) -> Vec<f64>, rng: &mut Trng) -> Vec<f64> {
+    algoritmo_bl(&entrenamiento, &algoritmo_1(&entrenamiento, rng), rng)
+}
+
+
+// Devuelve como solución un vector aleatorio uniforme. Se usará como solución inicial para la BL
+// Está estructurado como un algoritmo por cuestiones de legibilidad de código
+pub fn vector_au<Trng: Rng>(entrenamiento: &[Dato], rng: &mut Trng) -> Vec<f64> {
+    vector_aleatorio_uniforme(entrenamiento[0].num_atributos(), rng)
+}
+
+
+// Ejecuta búsqueda local de soluciones a partir de una dada con el procedimiento descrito en el guion
 // El orden en el que se mutan los atributos es el mismo en el que vienen en los datos
-pub fn busqueda_local<Trng: Rng>(entrenamiento: &[Dato], rng: &mut Trng) -> Vec<f64> {
+pub fn busqueda_local_desde<Trng: Rng>(entrenamiento: &[Dato], w_base: &[f64], rng: &mut Trng) -> Vec<f64> {
     // Generamos una solución inicial
     let n_atributos = entrenamiento[0].num_atributos();
     let mut distribucion = Normal::new(0.0, 0.3); // Función de distribución para las mutaciones de una componente
-    let mut w = vector_aleatorio_uniforme(n_atributos, rng);
+    let mut w = w_base.to_vec();
     let mut fw = evaluar(&entrenamiento, &w); // Puntuación de la mejor solución
 
     let mut atr = 0;      // posición del próximo atributo que va a ser mutado
@@ -102,6 +118,12 @@ pub fn busqueda_local<Trng: Rng>(entrenamiento: &[Dato], rng: &mut Trng) -> Vec<
     w
 }
 
+// Ejecuta búsqueda local con el procedimiento descrito en el guion
+// Parte de un vector aleatorio
+pub fn busqueda_local<Trng: Rng>(entrenamiento: &[Dato], rng: &mut Trng) -> Vec<f64> {
+    combinar(&entrenamiento, &vector_au, &busqueda_local_desde, rng)
+}
+
 
 // Ejecuta el algoritmo greedy RELIEF para obtener un vector de pesos
 // Requiere que todos los atributos sean valores reales
@@ -135,18 +157,11 @@ pub fn uno_nn<Trng: Rng>(entrenamiento: &[Dato], _rng: &mut Trng) -> Vec<f64> {
 
 // Implementaciones de algoritmos adicionales
 
-
-// Combina un algoritmo de búsqueda de soluciones con un criterio que modifica dichas soluciones
-// Por ejemplo, se puede usar para aplicar un truncamiento mayor que 0.2 a las soluciones de RELIEF
-pub fn combinar<Trng: Rng>(entrenamiento: &[Dato], rng: &mut Trng, algoritmo: &Fn(&[Dato], &mut Trng) -> Vec<f64>, criterio: &Fn(&[Dato], &[f64]) -> Vec<f64>) -> Vec<f64> {
-    criterio(&entrenamiento, &algoritmo(&entrenamiento, rng))
-}
-
 // Calcula el truncado óptimo para unos pesos en un conjunto de entrenamiento
 // Se trata de encontrar un valor tal que, anulando todos los pesos menores o
 //   iguales que dicho valor, se obtenga la máxima puntuación
 // Para ello se prueba a truncar en todos los valores distintos de 0 y 1
-pub fn truncado_optimo(entrenamiento: &[Dato], w_base: &[f64]) -> Vec<f64> {
+pub fn truncado_optimo<Trng: Rng>(entrenamiento: &[Dato], w_base: &[f64], _rng: &mut Trng) -> Vec<f64> {
     fn truncar(pesos: &[f64], corte: f64) -> Vec<f64> {
         pesos.iter().map(|p| if *p <= corte { 0.0 } else { *p } ).collect()
     } // Esta es la función que trunca un vector de pesos
@@ -174,7 +189,7 @@ pub fn truncado_optimo(entrenamiento: &[Dato], w_base: &[f64]) -> Vec<f64> {
 //   se obtenga la máxima puntuación (en particular, habrá más o menos pesos menores que 0.2)
 // Para ello se prueba a elevar el vector a los exponentes con los que cada uno de
 //   los valores (distintos de 0 y 1) pasa a tomar un valor ligeramente inferior a 0.2
-pub fn potencia_optima(entrenamiento: &[Dato], w_base: &[f64]) -> Vec<f64> {
+pub fn potencia_optima<Trng: Rng>(entrenamiento: &[Dato], w_base: &[f64], _rng: &mut Trng) -> Vec<f64> {
     fn elevar(pesos: &[f64], exp: f64) -> Vec<f64> {
         pesos.iter().map(|p| (*p).powf(exp)).collect()
     } // Esta es la función que eleva un vector de pesos componente a componente
@@ -203,27 +218,27 @@ pub fn potencia_optima(entrenamiento: &[Dato], w_base: &[f64]) -> Vec<f64> {
 // Ejecuta RELIEF y aplica al resultado el truncamiento óptimo
 // Al igual que RELIEF, requiere que todos los atributos sean valores reales
 pub fn relief_truncado<Trng: Rng>(entrenamiento: &[Dato], rng: &mut Trng) -> Vec<f64> {
-    combinar(&entrenamiento, rng, &relief, &truncado_optimo)
+    combinar(&entrenamiento, &relief, &truncado_optimo, rng)
 }
 
 
 // Ejecuta RELIEF y aplica al resultado el exponente óptimo
 // Al igual que RELIEF, requiere que todos los atributos sean valores reales
 pub fn relief_potencia<Trng: Rng>(entrenamiento: &[Dato], rng: &mut Trng) -> Vec<f64> {
-    combinar(&entrenamiento, rng, &relief, &potencia_optima)
+    combinar(&entrenamiento, &relief, &potencia_optima, rng)
 }
 
 
-// Ejecuta búsqueda local de soluciones con un procedimiento de mutación distinto
+// Ejecuta búsqueda local de soluciones a partir de una dada con un procedimiento de mutación distinto
 // En lugar de truncar el valor de la componente modificada si toma un valor mayor que 1,
 //   se normaliza el vector. Esto puede hacer que varios elementos bajen rápidamente del
 //   umbral 0.2, pudiendo obtener soluciones más simples rápidamente.
 // El orden de los atributos es el mismo en el que vienen en los datos
-pub fn busqueda_local_mut2<Trng: Rng>(entrenamiento: &[Dato], rng: &mut Trng) -> Vec<f64> {
+pub fn busqueda_local_mut2_desde<Trng: Rng>(entrenamiento: &[Dato], w_base: &[f64], rng: &mut Trng) -> Vec<f64> {
     // Generamos una solución inicial
     let n_atributos = entrenamiento[0].num_atributos();
     let mut distribucion = Normal::new(0.0, 0.3); // Función de distribución para las mutaciones de una componente
-    let mut w = vector_aleatorio_uniforme(n_atributos, rng);
+    let mut w = w_base.to_vec();
     let mut fw = evaluar(&entrenamiento, &w); // Puntuación de la mejor solución
 
     let mut atr = 0;      // posición del próximo atributo que va a ser mutado
@@ -265,14 +280,20 @@ pub fn busqueda_local_mut2<Trng: Rng>(entrenamiento: &[Dato], rng: &mut Trng) ->
     w
 }
 
+// Ejecuta búsqueda local con un procedimiento de mutación distinto
+// Parte de un vector aleatorio
+pub fn busqueda_local_mut2<Trng: Rng>(entrenamiento: &[Dato], rng: &mut Trng) -> Vec<f64> {
+    combinar(&entrenamiento, &vector_au, &busqueda_local_mut2_desde, rng)
+}
 
-// Ejecuta búsqueda local de soluciones con un criterio de ordenación de atributos
+
+// Ejecuta búsqueda local de soluciones a partir de una dada con un criterio de ordenación de atributos
 // Los atributos que por sí solos clasifican mejor la muestra de entrenamiento se exploran primero
-pub fn busqueda_local_orden<Trng: Rng>(entrenamiento: &[Dato], rng: &mut Trng) -> Vec<f64> {
+pub fn busqueda_local_orden_desde<Trng: Rng>(entrenamiento: &[Dato], w_base: &[f64], rng: &mut Trng) -> Vec<f64> {
     // Generamos una solución inicial
     let n_atributos = entrenamiento[0].num_atributos();
     let mut distribucion = Normal::new(0.0, 0.3); // Función de distribución para las mutaciones de una componente
-    let mut w = vector_aleatorio_uniforme(n_atributos, rng);
+    let mut w = w_base.to_vec();
     let mut fw = evaluar(&entrenamiento, &w); // Puntuación de la mejor solución
 
     let mut atr_id = 0;   // posición (en el vector ordenado) del próximo atributo que va a ser mutado
@@ -331,14 +352,20 @@ pub fn busqueda_local_orden<Trng: Rng>(entrenamiento: &[Dato], rng: &mut Trng) -
     w
 }
 
+// Ejecuta búsqueda local con un criterio de ordenación de atributos
+// Parte de un vector aleatorio
+pub fn busqueda_local_orden<Trng: Rng>(entrenamiento: &[Dato], rng: &mut Trng) -> Vec<f64> {
+    combinar(&entrenamiento, &vector_au, &busqueda_local_orden_desde, rng)
+}
 
-// Ejecuta búsqueda local de soluciones con el criterio de ordenación de atributos y con
-//   el operador de mutación alternativo
-pub fn busqueda_local_orden_mut2<Trng: Rng>(entrenamiento: &[Dato], rng: &mut Trng) -> Vec<f64> {
+
+// Ejecuta búsqueda local de soluciones a partir de una dada con el criterio de
+//   ordenación de atributos y con el operador de mutación alternativo
+pub fn busqueda_local_orden_mut2_desde<Trng: Rng>(entrenamiento: &[Dato], w_base: &[f64], rng: &mut Trng) -> Vec<f64> {
     // Generamos una solución inicial
     let n_atributos = entrenamiento[0].num_atributos();
     let mut distribucion = Normal::new(0.0, 0.3); // Función de distribución para las mutaciones de una componente
-    let mut w = vector_aleatorio_uniforme(n_atributos, rng);
+    let mut w = w_base.to_vec();
     let mut fw = evaluar(&entrenamiento, &w); // Puntuación de la mejor solución
 
     let mut atr_id = 0;   // posición (en el vector ordenado) del próximo atributo que va a ser mutado
@@ -398,6 +425,13 @@ pub fn busqueda_local_orden_mut2<Trng: Rng>(entrenamiento: &[Dato], rng: &mut Tr
     };
 
     w
+}
+
+// Ejecuta búsqueda local con el criterio de ordenación de atributos y con
+//   el operador de mutación alternativo
+// Parte de un vector aleatorio
+pub fn busqueda_local_orden_mut2<Trng: Rng>(entrenamiento: &[Dato], rng: &mut Trng) -> Vec<f64> {
+    combinar(&entrenamiento, &vector_au, &busqueda_local_orden_mut2_desde, rng)
 }
 
 
