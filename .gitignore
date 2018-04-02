@@ -1,3 +1,14 @@
 
 /target/
 **/*.rs.bk
+/entregas/
+
+*.aux
+*.idx
+*.gz
+*.log
+*.out
+*.toc
+*.pdf
+*.txt
+DNI.txt

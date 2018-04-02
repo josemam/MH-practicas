@@ -1,0 +1,438 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage[spanish,es-tabla]{babel}
+\usepackage{amsmath,amsthm}
+\usepackage{xfrac}
+\usepackage{graphicx, float}
+\usepackage{adjustbox} % Permite detallar el tamaño de las tablas
+\usepackage{amssymb}
+\usepackage{enumitem}
+\usepackage{wrapfig}
+\usepackage{import}
+\usepackage[dvipsnames]{xcolor}
+\usepackage[spanish,onelanguage]{algorithm2e} % Pseudocódigo
+\usepackage[colorlinks,linkcolor=BrickRed,urlcolor=Blue]{hyperref} % URLs, referencias a tablas
+\usepackage{mathpazo} % Palatino font
+\usepackage{multirow} % Múltiples filas por celda
+
+\DeclareMathOperator*{\argmin}{argmin}
+
+% Entorno para controlar el espacio antes y después de un algoritmo
+\newenvironment{algo}{
+	\vspace*{0.5cm}
+	\begin{algorithm}[H]}{
+	\end{algorithm}
+	\vspace*{0.5cm}
+}
+
+% ///////////////////////////////////////////////////////////////////////////////////////
+% Se ha usado la plantilla https://www.latextemplates.com/template/academic-title-page
+% Autoría de la plantilla
+% WikiBooks (LaTeX - Title Creation) with modifications by:
+% Vel (vel@latextemplates.com)
+%
+% Licencia de la plantilla:
+% CC BY-NC-SA 3.0 (http://creativecommons.org/licenses/by-nc-sa/3.0/)
+% ///////////////////////////////////////////////////////////////////////////////////////
+
+\begin{document}
+
+\begin{titlepage} % Suppresses displaying the page number on the title page and the subsequent page counts as page 1
+	\newcommand{\HRule}{\rule{\linewidth}{0.5mm}} % Defines a new command for horizontal lines, change thickness here
+	
+	\center % Centre everything on the page
+	
+	%------------------------------------------------
+	%	Headings
+	%------------------------------------------------
+	
+	\textsc{\LARGE Universidad de Granada}\\[1.5cm] % Main heading such as the name of your university/college
+	
+	\textsc{Metaheurísticas}\\[0.3cm] % Major heading such as course name
+	
+	\textsc{Curso 2017-2018}\\[0.5cm] % Minor heading such as course title
+	
+	%------------------------------------------------
+	%	Title
+	%------------------------------------------------
+	
+	\HRule\\[0.4cm]
+	{\huge\bfseries Práctica 1: Técnicas de Búsqueda Local y Algoritmos Greedy}\\[0.4cm] % Title of your document
+	
+	\HRule\\[1.5cm]
+	
+	\textsc{Aprendizaje de Pesos en Características}\\[0.5cm]
+	
+	\vfill
+
+	\textsc{José Manuel Muñoz Fuentes}\\
+	\input{DNI.txt}\\
+	\texttt{jmlosvillares@correo.ugr.es}\\
+	{\footnotesize\textsc{Grupo de prácticas 2 (martes 17:30 - 19:30)}}
+
+	\vfill\vfill\vfill % Position the date 3/4 down the remaining page
+	
+	{\large\today} % Date, change the \today to a set date if you want to be precise
+
+	\vfill\vfill
+	\includegraphics[width=0.2\textwidth]{ugr.png}\\[1cm] % Include a department/university logo - this will require the graphicx package
+	
+	%----------------------------------------------------------------------------------------
+	
+	\vfill % Push the date up 1/4 of the remaining page
+	
+\end{titlepage}
+\tableofcontents
+
+\include{descripcion}
+
+\section{Aspectos comunes a todos los algoritmos}
+
+Dado que los algoritmos buscarán pesos óptimos, las soluciones de los algoritmos consistirán en tuplas de pesos con tantas componentes como el número de características observadas en la muestra. Cada peso $w_i$ se representará como un valor real entre $0$ y $1$, de forma que la distancia entre dos datos $\normalfont \textbf x$ y $\normalfont \textbf d$ se calculará como $\sum_i \delta(w_i)(x_i - d_i)^2$, donde $\delta(x) = 0$ si $x < 0.2$ y $\delta(x) = x$ en caso contrario. Expresado de otra forma, los pesos menores que $0.2$ en una solución son considerados nulos en el cálculo de la distancia entre dos datos. \\
+
+Para buscar los pesos óptimos, los algoritmos tratarán de conseguir unos pesos que clasifiquen cada uno de los elementos $\normalfont \textbf d$ en una muestra de entrenamiento $T$ de datos con $N$ características que contiene $|T|$ datos usando el resto de elementos de $T$ consiguiendo el mayor porcentaje posible de aciertos (es decir, de elementos cuya clase coincide con la de su vecino más cercano para la función distancia con los pesos escogidos) \texttt{tasa\_clas} y que sean nulos en el mayor porcentaje posible \texttt{tasa\_red}, de forma que ambos estadísticos tengan la misma importancia. Por ello, la función objetivo es, salvo una constante de proporcionalidad, $\texttt{tasa\_clas} + \texttt{tasa\_red}$, que se expresa como: $$\frac 1 {|T|} \sum_{\normalfont \textbf d \in T} Igual(clase(\argmin_{\normalfont \textbf x \in T \setminus \{ \normalfont \textbf d \}} \sum_{i = 1}^N w_i(x_i - d_i)^2),\ clase(\normalfont \textbf d)) + \frac 1 N \sum_{i = 1}^N Nulo(w_i)$$
+donde:
+\begin{itemize}
+	 \item $Igual$ es una función que devuelve $1$ si sus dos argumentos toman el mismo valor y $0$ en el caso contrario.
+	\item $clase$ es una función que devuelve la clase de un dato. Nótese que se conoce $clase(\normalfont \textbf d)$ para cada $\normalfont \textbf d \in T$: las clases de los elementos en la muestra de entrenamiento son conocidas.
+	\item $Nulo$ es una función que devuelve $1$ si recibe un peso que se considera nulo (es decir, menor que $0.2$), y devuelve $0$ en el caso contrario.
+\end{itemize}
+
+De esta forma, la función objetivo puede implementarse a partir del siguiente pseudocódigo: \\
+
+\begin{algo}
+	\KwIn{$\normalfont \textbf w = \{w_1,\ ...,\ w_N\}$ tupla de pesos, $T$ conjunto de entrenamiento}
+	\KwOut{Valoración de la solución}
+
+	$V_1 := 0$\;
+	$V_2 := 0$\;
+	\ForAll{$\normalfont \textbf d \in T$} {
+		$\normalfont \textbf x := nearest(\normalfont \textbf d, T \setminus \{ \normalfont \textbf d \}, \normalfont \textbf w)$\;
+		\If{$clase(\normalfont \textbf x) = clase(\normalfont \textbf d)$}{
+			$V_1 := V_1 + 1$\;
+		}	
+	}
+	\ForAll{$i$ \textnormal{\textbf{desde}} $1$ \textnormal{\textbf{hasta}} $N$} {
+		\If{$w_i < 0.2$}{
+			$V_2 := V_2 + 1$\;
+		}
+	}
+	\KwRet{$\displaystyle \frac {V_1} {|T|} + \frac {V_2} N$}
+	\vspace{0.2cm}
+	\caption{Función objetivo}
+\end{algo}
+
+La función $nearest$ se describe así:
+
+\begin{algo}
+	\KwIn{$\normalfont \textbf d = \{d_1,\ ...,\ d_N\}$ dato, $T$ conjunto, $\normalfont \textbf w = \{w_1,\ ...,\ w_N\}$ tupla de pesos}
+	\KwOut{Vecino más cercano de $\normalfont \textbf d$ en $T$ según los pesos $\normalfont \textbf w$}
+
+	menor-distancia $:= \infty$\;
+	\ForAll{$\normalfont \textbf t \in T$}{
+		distancia $:= dist^2(\normalfont \textbf t,\ \normalfont \textbf d,\ \normalfont \textbf w)$\;
+		\If{distancia $<$ menor-distancia}{
+			$\normalfont \textbf x := \normalfont \textbf t$\;
+			menor-distancia $:=$ distancia\;
+		}
+	}
+	\KwRet{$\normalfont \textbf x$}
+	\vspace{0.2cm}
+	\caption{Algoritmo de obtención del vecino más cercano}
+\end{algo}
+
+La función $dist^2$, que será utilizada por sí sola en procedimientos del algoritmo $RELIEF$, sigue este esquema:
+
+\begin{algo}
+	\KwIn{$\normalfont \textbf a = \{a_1,\ ...,\ a_N\}$ dato, $\normalfont \textbf b = \{b_1,\ ...,\ b_N\}$ dato, $\normalfont \textbf w = \{w_1,\ ...,\ w_N\}$ tupla de pesos}
+	\KwOut{Distancia entre $\normalfont \textbf a$ y $\normalfont \textbf b$ considerando los pesos $\normalfont \textbf w$}
+	
+	distancia $:= 0$\;
+	\ForAll{$i$ \textnormal{\textbf{desde}} $1$ \textnormal{\textbf{hasta}} $N$} {
+		distancia $:=$ distancia $+$ $w_i (a_i - b_i)^2$\;
+	}
+	\KwRet{distancia}
+	\vspace{0.2cm}
+	\caption{Función distancia al cuadrado, $dist^2$}
+\end{algo}
+
+Para establecer la división de la muestra de entrenamiento en cinco grupos equilibrados dentro del procedimiento \textit{$5$-fold cross validation} se ha optado por seguir este algoritmo de partición, que se resume en que se dividen los elementos según su clase y después se reparten de forma proporcional entre los cinco conjuntos:
+
+\begin{algo}
+	\KwIn{$T = \{ \normalfont \textbf t_1,\ ...,\ \normalfont \textbf t_{|T|} \}$ conjunto de datos, $C = \{c_1,\ ...,\ c_k\}$ conjunto de clases que toman los datos en $T$}
+	\KwOut{$T_1$, $T_2$, $T_3$, $T_4$, $T_5$ que forman partición equilibrada de $T$}
+
+	$T_1 := \emptyset$\;
+	$T_2 := \emptyset$\;
+	$T_3 := \emptyset$\;
+	$T_4 := \emptyset$\;
+	$T_5 := \emptyset$\;
+	
+	\ForAll{$c \in C$}{
+		$T_c := \{ \normalfont \textbf t \in T \ | \ clase(\normalfont \textbf t) = c \}$\;
+		\ForAll{$i$ \textnormal{\textbf{desde}} $1$ \textnormal{\textbf{hasta}} $5$}{
+			\textbf{Extraer} $redondeo(|T_c| / (5 - i))$ elementos de $T_c$ e \textbf{introducirlos} en $T_i$\;
+		}
+	}
+	\KwRet{$T_1$, $T_2$, $T_3$, $T_4$, $T_5$}
+	\vspace{0.2cm}
+	\caption{Algoritmo de partición equilibrada de una muestra}
+\end{algo}
+
+Para tratar de dar aproximadamente el mismo número de elementos de cierta clase a cada uno de los conjuntos, se divide el número de elementos de la clase que todavía no han sido asignados a un conjunto por el número de conjuntos a los que todavía no se les ha asignado ningún elemento de la clase y se entrega a ese conjunto tal número de datos.
+
+\section{Búsqueda local}
+
+Este es el esquema que sigue el método de exploración del entorno en el método pedido de búsqueda local:
+
+\begin{algo}
+	\KwIn{$\normalfont \textbf w$ solución (es decir, pesos) a partir de la cual se quiere explorar}
+	\KwOut{$\normalfont \textbf w_n$ nueva solución}
+
+	$\normalfont \textbf w_n := \normalfont \textbf w$\;
+	\While{no se ha superado el tope de evaluaciones de la función objetivo ni se ha mutado $20$ veces cada componente de $\normalfont \textbf w$}{
+		\ForAll{$i$ \textnormal{\textbf{desde}} $1$ \textnormal{\textbf{hasta}} $N$}{
+			$\normalfont \textbf w_c := Vecina(\normalfont \textbf w,\ i)$\;
+			\If{$\normalfont \textbf w_c$ es mejor que $\normalfont \textbf w_n$}{
+				$\normalfont \textbf w_n := \normalfont \textbf w_c$\;
+				\textbf{Salir} del bucle interno\;
+			}
+		}
+	}
+
+	\KwRet{$\normalfont \textbf w_n$}
+	\vspace{0.2cm}
+	\caption{Algoritmo de exploración del entorno en búsqueda local}
+\end{algo}
+
+El procedimiento para generar una solución vecina a otra, $Vecina(\normalfont \textbf w,\ i)$ es el siguiente:
+
+\begin{algo}
+	\KwIn{$\normalfont \textbf w$ solución (es decir, pesos), $i$ posición}
+	\KwOut{$\normalfont \textbf w_n$ solución vecina a $\normalfont \textbf w$}
+	
+	$\normalfont \textbf w_n := \normalfont \textbf w$\;
+	$(\normalfont \textbf w_n)_i := (\normalfont \textbf w_n)_i + Normal(0,\ 0.3)$\;
+	\If{$(\normalfont \textbf w_n)_i < 0$}{
+		$(\normalfont \textbf w_n)_i := 0$\;
+	}\ElseIf{$(\normalfont \textbf w_n)_i > 1$}{
+		$(\normalfont \textbf w_n)_i := 1$\;
+	}
+	\KwRet{$\normalfont \textbf w_n$}
+	\vspace{0.2cm}
+	\caption{Algoritmo de obtención de solución vecina mutando la componente $i$-ésima. $Normal(0,\ 0.3)$ es una función que devuelve un número siguiendo una distribución normal de media $0$ y desviación típica $0.3$.}
+\end{algo}
+
+Se ha observado poco antes de la hora de entrega que falta normalizar los pesos en caso de que el valor fuese $1.0$ y haya dejado de serlo. El código entregado contiene ese error. \\
+
+La solución aleatoria inicial se obtiene con este procedimiento:
+
+\begin{algo}
+	\KwIn{$N$ número de componentes}
+	\KwOut{$\normalfont \textbf w_r$ solución aleatoria}
+	\ForAll{$i$ \textnormal{\textbf{desde}} $1$ \textnormal{\textbf{hasta}} $N$}{
+		$(\normalfont \textbf w_r)_i := Uniforme(0,\ 1)$
+	}
+	\KwRet{$\normalfont \textbf w_r / \max_{i = \{ 1,\ ...,\ N \}} (\normalfont \textbf w_r)_i$}
+	\vspace{0.2cm}
+	\caption{Algoritmo de obtención de solución aleatoria de $N$ componentes. $Uniforme(0,\ 1)$ es una función que devuelve un número siguiendo una distribución uniforme entre $0$ y $1$.}
+\end{algo}
+
+\section{Algoritmo RELIEF}
+
+El siguiente pseudocódigo se corresponde con la implementación del algoritmo RELIEF, donde $abs(v)$ es la operación valor absoluto componente a componente de $v$:
+
+\begin{algo}
+	\KwIn{$T$ conjunto de datos de $N$ características}
+	\KwOut{$\normalfont \textbf w$ pesos}
+
+	$\normalfont \textbf w := (0,\ 0,\ ...,\ 0)$\;
+	$\normalfont \textbf w_d := (1,\ 1,\ ...,\ 1)$\;
+
+	\ForAll{$e \in T$} {
+		$e_a := nearest$-$friend(e, T, \normalfont \textbf w_d)$\;
+		$e_e := nearest$-$enemy(e, T, \normalfont \textbf w_d)$\;
+		$\normalfont \textbf w := w - abs(e - e_e) + abs(e - e_a)$\;
+	}
+	$max := 0$\;
+	\ForAll{$i$ \textnormal{\textbf{desde}} $1$ \textnormal{\textbf{hasta}} $N$} {
+		\If{$w_i > max$}{
+			$max := w_i$\;
+		}
+	}
+	\ForAll{$i$ \textnormal{\textbf{desde}} $1$ \textnormal{\textbf{hasta}} $N$} {
+		\If{$w_i < 0$}{
+			$w_i := 0$\;
+		}\Else{
+			$w_i := w_i / max$\;
+		}
+	}
+	\KwRet{$\normalfont \textbf w$}
+	\vspace{0.2cm}
+	\caption{RELIEF}
+\end{algo}
+
+La función $nearest$-$friend$ encuentra el elemento más cercano de la misma clase, y la función $nearest$-$enemy$ devuelve el elemento más cercano de una clase distinta. Se llaman con los pesos todos a $1$ para usar la distancia euclídea. Se describen así:
+
+
+\begin{algo}
+	\KwIn{$\normalfont \textbf d = \{d_1,\ ...,\ d_N\}$ dato, $T$ conjunto, $\normalfont \textbf w = \{w_1,\ ...,\ w_N\}$ tupla de pesos}
+	\KwOut{Amigo más cercano de $\normalfont \textbf d$ en $T$ según los pesos $\normalfont \textbf w$}
+
+	$T := T \setminus \normalfont \textbf d$\;
+	menor-distancia $:= \infty$\;
+	\ForAll{$\normalfont \textbf t \in T$}{
+		distancia $:= dist^2(\normalfont \textbf t,\ \normalfont \textbf d,\ \normalfont \textbf w)$\;
+		\If{distancia $<$ menor-distancia y $clase(\normalfont \textbf t) = clase(\normalfont \textbf d)$}{
+			$\normalfont \textbf x := \normalfont \textbf t$\;
+			menor-distancia $:=$ distancia\;
+		}
+	}
+	\KwRet{$\normalfont \textbf x$}
+	\vspace{0.2cm}
+	\caption{Algoritmo de obtención del amigo más cercano}
+\end{algo}
+
+\begin{algo}
+	\KwIn{$\normalfont \textbf d = \{d_1,\ ...,\ d_N\}$ dato, $T$ conjunto, $\normalfont \textbf w = \{w_1,\ ...,\ w_N\}$ tupla de pesos}
+	\KwOut{Enemigo más cercano de $\normalfont \textbf d$ en $T$ según los pesos $\normalfont \textbf w$}
+	
+	menor-distancia $:= \infty$\;
+	\ForAll{$\normalfont \textbf t \in T$}{
+		distancia $:= dist^2(\normalfont \textbf t,\ \normalfont \textbf d,\ \normalfont \textbf w)$\;
+		\If{distancia $<$ menor-distancia y $clase(\normalfont \textbf t) \neq clase(\normalfont \textbf d)$}{
+			$\normalfont \textbf x := \normalfont \textbf t$\;
+			menor-distancia $:=$ distancia\;
+		}
+	}
+	\KwRet{$\normalfont \textbf x$}
+	\vspace{0.2cm}
+	\caption{Algoritmo de obtención del enemigo más cercano}
+\end{algo}
+
+\section{Algoritmos adicionales}
+
+El algoritmo RELIEF claramente no trata de aprovechar la bonificación que otorga utilizar menos pesos. Para tratar de explotar esta puntuación se proponen dos búsquedas locales que exploran completamente un entorno muy pequeño de las soluciones que ofrece RELIEF. Una trata de truncar todos los pesos menores o iguales que uno dado; otra eleva todos los pesos al exponente al que hay que elevar cada uno de los pesos para que tome un valor ligeramente menor que $0.2$, si eso es posible (el peso no debe ser $0$ ni $1$). \\
+
+El objetivo es tratar de reducir la complejidad de las soluciones sin dejar de aprovechar la buena tasa de clasificación del resultado de RELIEF. El número de vecinos es menor que el número de componentes del vector de pesos, dado que a lo sumo hay un vecino para cada componente. \\
+
+\begin{algo}
+	\KwIn{$\normalfont \textbf w$ solución (es decir, pesos), $i$ posición}
+	\KwOut{$\normalfont \textbf w_n$ solución vecina a $\normalfont \textbf w$ o NADA}
+
+	\If{$w_i < 0.2$ o $w_i = 1$}{
+		\KwRet{NADA}
+	}
+	$\normalfont \textbf w_n := \normalfont \textbf w$\;
+	\ForAll{$j$ \textnormal{\textbf{desde}} $1$ \textnormal{\textbf{hasta}} $N$}{
+		\If{$w_j \leq w_i$}{
+			$(w_n)_j := 0$\;
+		}
+	}
+	\KwRet{$\normalfont \textbf w_n$}
+	\vspace{0.2cm}
+	\caption{Búsqueda local de soluciones por truncamiento. El algoritmo que aplica este procedimiento al resultado de RELIEF se notará RELIEF+tr}
+\end{algo}
+
+\begin{algo}
+	\KwIn{$\normalfont \textbf w$ solución (es decir, pesos), $i$ posición}
+	\KwOut{$\normalfont \textbf w_n$ solución vecina a $\normalfont \textbf w$ o NADA}
+	
+	\If{$w_i = 0.0$ o $w_i = 1$}{
+		\KwRet{NADA}
+	}
+	$e := \log_{w_i}{0.1999999}$\;
+	$\normalfont \textbf w_n := \normalfont \textbf w$\;
+	\ForAll{$j$ \textnormal{\textbf{desde}} $1$ \textnormal{\textbf{hasta}} $N$}{
+		$(w_n)_j := (w_n)_j^e$\;
+	}
+	\KwRet{$\normalfont \textbf w_n$}
+	\vspace{0.2cm}
+	\caption{Búsqueda local de soluciones por exponenciación. El algoritmo que aplica este procedimiento al resultado de RELIEF se notará RELIEF+pw}
+\end{algo}
+
+Nótese que ambos procedimientos son inútiles si todos los pesos son $1$ como en el caso del 1-NN: no tiene vecinos según estos operadores. \\
+
+Adicionalmente se incluyen dos versiones alternativas de la búsqueda local. Una de ellas, BL-ord, explora los atributos en un orden determinado por la capacidad de clasificar la muestra usando solo cada atributo. Es decir, muta primero las componentes asociadas a los atributos que mejor explican la muestra. Otra es BL-mut2 que emplea un operador de mutación distinto:
+
+\begin{algo}
+	\KwIn{$\normalfont \textbf w$ solución (es decir, pesos), $i$ posición}
+	\KwOut{$\normalfont \textbf w_n$ solución vecina a $\normalfont \textbf w$}
+	$\normalfont \textbf w_n := \normalfont \textbf w$\;
+	ERA-1 $:= \normalfont \textbf (w_n)_i = 1$\;
+	$(\normalfont \textbf w_n)_i := (\normalfont \textbf w_n)_i + Normal(0,\ 0.3)$\;
+	\If{$(\normalfont \textbf w_n)_i < 0$}{
+		$(\normalfont \textbf w_n)_i := 0$\;
+	}
+	\If{ERA-1 o $(\normalfont \textbf w_n)_i > 1$}{
+		$\normalfont \textbf w_n := \normalfont \textbf w_n/\max_{i = \{ 1,\ ...,\ N \}} (\normalfont \textbf w_n)_i$\;
+	}
+	\KwRet{$\normalfont \textbf w_n$}
+	\vspace{0.2cm}
+	\caption{Operador alternativo de obtención de solución vecina mutando la componente $i$-ésima. $Normal(0,\ 0.3)$ es una función que devuelve un número siguiendo una distribución normal de media $0$ y desviación típica $0.3$.}
+\end{algo}
+
+Este operador alternativo tiene la particularidad de que, si al mutar la componente nos excedemos de $1$, en lugar de truncar la componente normaliza el vector. Esto permite obtener soluciones más simples rápidamente. \\
+
+Una combinación de ambos algoritmos utiliza tanto ordenación de atributos como el operador alternativo. Se denomina BL-ord-mut2.
+
+\section{Descripción de la implementación}
+
+Se ha optado por realizar la práctica como un proyecto en el lenguaje de programación Rust, utilizando código de elaboración propia para todas las operaciones salvo la lectura de archivos ARFF, para la que se ha optado por utilizar código de otro proyecto. \\
+
+El código fuente de un proyecto Rust se almacena en una carpeta \texttt{src} que contiene ficheros de extensión \texttt{.rs} y carpetas.
+
+\begin{itemize}
+	\item En el archivo \texttt{knn/arff.rs} se implementa un lector de archivos ARFF procedente de \href{https://github.com/gyscos/varf}{este proyecto de GitHub}. Si fuese un paquete de Rust aislado se habría importado, pero incluir el paquete completo que lo contiene añadiría muchas dependencias y se ha optado por copiar la parte del código que interesa.
+	\item \texttt{knn/mod.rs} implementa el clasificador 1-NN con pesos. Para ello incluye la definición de la estructura \texttt{Dato}, cuyas instancias representan uno de los datos de una muestra; la implementación de la función distancia con pesos entre instancias de \texttt{Dato} en \texttt{distancia\_cuadrado}, funciones para obtener el elemento con menor distancia a un \texttt{Dato} en un conjunto de elementos \texttt{Dato} y un método que obtiene los datos en el formato de \texttt{Dato} a partir de la menos manejable estructura que se genera en \texttt{arff.rs}. \\ Está preparado para funcionar con variables categóricas además de variables reales, pero no se usa esta funcionalidad.
+	\item El archivo \texttt{evaluacion\_pesos.rs} contiene diversas funciones con las que evaluar clasificadores (o pesos). Incluye funciones para obtener los estadísticos \texttt{tasa\_clas} y \texttt{tasa\_red} y una función que implementa el procedimiento \textit{$5$-fold cross validation} e imprime los resultados en pantalla.
+	\item En \texttt{practica1.rs} se definen los algoritmos realizados para la práctica 1 y una función \texttt{main} que ejecuta los algoritmos para el conjunto de datos definido en un archivo ARFF recibido como parámetro utilizando como semilla del RNG una cadena de texto.
+\end{itemize}
+
+Se ha utilizado como generador de números pseudoaleatorios una implementación de \href{http://www.burtleburtle.net/bob/rand/isaac.html}{\texttt{ISAAC-64}} que está incluida en el paquete \texttt{rand} de Rust. La elección de un RNG concreto permite obtener los mismos resultados a partir de la misma semilla en cualquier máquina en la que se ejecute el programa. El algoritmo es criptográficamente seguro, aunque en la \href{https://docs.rs/rand/0.4.2/rand/struct.Isaac64Rng.html}{documentación} de la estructura que implementa \texttt{ISAAC-64} en Rust no garantizan que esta implementación lo sea. También tiene períodos muy largos que aumentan con el tamaño de la semilla, que es una lista de enteros de $64$ bits de longitud arbitraria.
+
+El gestor de paquetes de Rust, llamado \textit{cargo}, permite compilar de forma cómoda el proyecto, descargando y compilando las dependencias automáticamente. Para compilar el proyecto hay que usar \texttt{cargo build}, pudiendo usar el parámetro \texttt{--release} para aplicar optimización de código. El programa se almacenará en \texttt{target/build}, o \texttt{target/release} si se ha utilizado el parámetro \texttt{--release}. Si en lugar de \texttt{build} el argumento es \texttt{run}, el programa se ejecuta además de ser compilado. \\
+
+Para probar el programa con los tres archivos de datos de la práctica basta llamar al programa sin argumentos mientras se tiene como directorio actual la carpeta que contiene \texttt{instances}, que es la carpeta que debe contener los tres archivos de datos. Si se le pasa la ruta a un archivo como un argumento, intenta leer los datos de este archivo. A través del parámetro \texttt{-s} o \texttt{--seed} se puede introducir una cadena de texto, que debe estar entre comillas si contiene espacios, de la que se extraerá una semilla para el RNG. Nótese que el programa no está preparado para comprobar si el archivo que recibe como parámetro es un ARFF o no: su comportamiento está indeterminado si recibe un archivo que no es un ARFF.
+
+\section{Experimentación}
+
+Para probar los algoritmos se han utilizado los tres conjuntos de datos ofrecidos en la asignatura: \texttt{ozone-320}, \texttt{parkinsons} y \texttt{spectf-heart}. \\
+
+En las pruebas se ha utilizado como semilla la cadena de texto por defecto en el programa, que es esta: ``\texttt{Es el usuario el que elige a la semilla y es la semilla la que quiere que sean los usuarios la semilla.}'' y da lugar a la lista de números enteros sin signo de 64 bits siguiente: \\
+$[5004379230916605299, 8458167372340028780,\ 2337778758777662569,\newline 7450396760082243872,\ 8315172586567524640,\ 8728087622983639328,\newline 8315172586567524640,\ 7809558900510105713,\ 8460404916989489525,\newline 7286951076348960876,\ 8030798249352061298,\ 7597417679491768435,\newline 7308613684687875584]$ \\
+
+Con esta lista de números se inicializó el generador de números aleatorios \texttt{ISAAC64} antes de evaluar cada algoritmo sobre cada uno de los conjuntos de prueba. \\
+
+A continuación se presentan los resultados obtenidos por el programa en cada uno de los algoritmos implementados. El programa ha sido ejecutado en un PC de sobremesa con un procesador \href{https://ark.intel.com/es-es/products/53445/Intel-Core-i5-2310-Processor-6M-Cache-up-to-3_20-GHz}{Intel® Core™ i5-2310 a 2,90 GHz} con 4 GB de RAM sobre un sistema operativo Windows 7.
+
+\newcommand{\resultados}[2]{
+\begin{table}[H]
+	\centering
+	\caption{#2}
+	\def\arraystretch{1.27}
+	\begin{adjustbox}{center, max width=0.7\textwidth}
+		\input{#1.txt}
+	\end{adjustbox}
+\end{table}
+}
+
+\resultados{1-NN}{Resultados obtenidos por el algoritmo 1-NN en el problema del APC}
+\resultados{RELIEF}{Resultados obtenidos por el algoritmo RELIEF en el problema del APC}
+\resultados{BL}{Resultados obtenidos por el algoritmo de búsqueda local en el problema del APC}
+\resultados{RELIEF+tr}{Resultados obtenidos por RELIEF combinado con búsqueda de truncamiento en el problema del APC}
+\resultados{RELIEF+pw}{Resultados obtenidos por RELIEF combinado con búsqueda de exponente en el problema del APC}
+\resultados{BL-mut2}{Resultados obtenidos por el algoritmo de búsqueda local con el operador alternativo de mutación en el problema del APC}
+\resultados{BL-ord}{Resultados obtenidos por el algoritmo de búsqueda local ordenando los atributos en el problema del APC}
+\resultados{BL-ord-mut2}{Resultados obtenidos por el algoritmo de búsqueda local ordenando los atributos y con el operador alternativo de mutación en el problema del APC}
+\resultados{tabla-global}{Resultados globales en el problema del APC}
+
+El algoritmo RELIEF no consigue tasas de clasificación correcta significativamente superiores a las del clasificador 1-NN, pero consigue puntuaciones agregadas superiores gracias a su tasa de reducción no nula. Sin embargo, no está diseñado para perseguir pesos nulos, y dicho porcentaje de reducción se debe a que, por coincidencia, hay pesos que quedan por debajo de $0.2$. Debido a que no consigue porcentajes de reducción considerables, queda muy por debajo de la búsqueda local propuesta en el guion, que encuentra soluciones con tasa de clasificación similar (salvo en \texttt{parkinsons}) eliminando tres cuartas partes de las variables. La búsqueda local probablemente no encuentra soluciones con una tasa de clasificación a la altura de RELIEF porque se dirige rápidamente hacia soluciones más simples. \\
+
+Sin embargo, una búsqueda local muy rápida aplicada al resultado que ofrece RELIEF permite eliminar muchas variables con una tasa de reducción superior a la de la búsqueda local propuesta. Tanto la búsqueda de truncamiento como la búsqueda de exponente permiten obtener pesos mucho más simples a costa de una pequeña reducción de la tasas de acierto que tenían los pesos obtenidos mediante RELIEF. En particular la búsqueda de truncamiento ofrece soluciones casi siempre ligeramente mejores que las de la búsqueda de exponente y requiere un tiempo de ejecución menor. RELIEF+tr seguramente resulte más adecuado que RELIEF como algoritmo de comparación para las próximas prácticas. Por el momento, obtiene resultados considerablemente mejores que nuestra búsqueda local con un tiempo de ejecución dos órdenes de magnitud menor. La sencillez de estos dos algoritmos, su bajo tiempo de ejecución y la facilidad con la que explotan la tasa de reducción sugieren que tal vez \texttt{tasa\_red} no debería ser proporcional al número de pesos que no cuentan, sino, por ejemplo, al logaritmo más 1 o a la raíz cuadrada de tal cantidad, para que se premie más la reducción cuando ya hay menos pesos relevantes. \\
+
+Por otro lado, el operador de mutación alternativo consigue resultados consistentemente mejores en menos tiempo. Este operador de mutación hace más probable que múltiples peso queden por debajo del umbral $0.2$ en un solo paso debido a que algún peso tome un valor mayor que $1$ y se normalice el vector, aumentando considerablemente la tasa de reducción. Si en la operación se pierden variables importantes (cosa que puede tener un efecto menor en la tasa de acierto que en la tasa de reducción), posteriormente tendrán veinte oportunidades para volver a tomar valores altos. \\
+
+El ordenamiento de las variables no parece conseguir resultados consistentemente mejores que la búsqueda local propuesta, aunque al aplicárselo al algoritmo con el operador alternativo de mutación parece que mejora un poco sus resultados. Reduce algo el tiempo de ejecución cuando hay muchas variables. Ordenar las variables da más oportunidades de mutar a las que son más relevantes, pero si no se ordenan probablemente el algoritmo pase por las menos importantes sin obtener mejoras significativas y llegue a las importantes de todas formas.
+
+\end{document}
