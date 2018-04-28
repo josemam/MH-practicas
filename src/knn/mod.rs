@@ -1,4 +1,3 @@
-extern crate itertools;
 extern crate ordered_float;
 mod arff;
 
@@ -6,7 +5,6 @@ use self::arff::ArffContent;
 use std::{path, io};
 use std::collections::HashSet;
 use ordered_float::OrderedFloat;
-use self::itertools::multizip;    // Permite combinar las componentes de tres vectores
 use std::f64::INFINITY;
 use std::ops::{Index, IndexMut};
 use std::ptr; // Comparación de punteros
@@ -27,7 +25,7 @@ fn distancia_cuadrado_f(a: f64, b: f64) -> f64 {
 // Distancia entre vectores de características: distancia euclídea
 fn distancia_cuadrado_vc(a: &[String], b: &[String], w: &[f64]) -> f64 {
     let mut d = 0.0;
-    for (x, y, p) in multizip((a, b, w)) {
+    for (x, y, p) in izip!(a, b, w) {
         if *p >= 0.2 {
             d += p*distancia_cuadrado_c(x, y);
         }
@@ -38,7 +36,7 @@ fn distancia_cuadrado_vc(a: &[String], b: &[String], w: &[f64]) -> f64 {
 // Distancia entre vectores de reales: distancia euclídea
 fn distancia_cuadrado_vf(a: &[f64], b: &[f64], w: &[f64]) -> f64 {
     let mut d = 0.0;
-    for (x, y, p) in multizip((a, b, w)) {
+    for (x, y, p) in izip!(a, b, w) {
         if *p >= 0.2 {
             d += p*distancia_cuadrado_f(*x, *y);
         }
