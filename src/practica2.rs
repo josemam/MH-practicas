@@ -4,12 +4,14 @@ extern crate rand;          // Generador de números aleatorios
 extern crate ordered_float; // Implementación de orden total en flotantes (tiene en cuenta la existencia de NaN)
 extern crate byteorder;     // Permite interpretar arrays de 8 bits como de 64 bits independientemente de la máquina
 
-mod knn;
-mod evaluacion_pesos;
-mod funciones_practica1;    // Funciones implementadas para la práctica 1
+mod knn;                    // Implementa el clasificador K-NN
+mod evaluacion_pesos;       // Contiene las funciones para evaluar los distintos algoritmos
+mod funciones_practica1;    // Recuperamos la búsqueda local y las funciones de combinación de algoritmos
+mod funciones_practica2;    // Funciones implementadas para la práctica 2
 
 use byteorder::{ByteOrder, BigEndian};
-use funciones_practica1::*;   // Usamos todas las funciones implementadas para la práctica 1, lógicamente
+use funciones_practica2::*;   // Usamos todas las funciones implementadas para la práctica 2, lógicamente
+use funciones_practica1::*;   // Volvemos a evaluar algunos algoritmos de la práctica 1
 
 
 
@@ -25,12 +27,23 @@ fn test(archivo: &str, semilla: &[u64]) {
             (uno_nn, "1NN"),
             (relief, "RELIEF"),
             (busqueda_local, "Búsqueda local"),
+            (agg_blx, "AGG_BLX"),
+            (agg_ca, "AGG_CA"),
+            (age_blx, "AGE_BLX"),
+            (age_ca, "AGE_CA"),
+            (am_a, "AM-(10,1.0)"),
+            (am_b, "AM-(10,0.1)"),
+            (am_c, "AM-(10,0.1mej)"),
             (relief_truncado, "RELIEF + truncado"),
             (relief_potencia, "RELIEF + potencia"),
             (relief_afinidad, "RELIEF + afinidad"),
             (busqueda_local_mut2, "BL con otra mutación"),
             (busqueda_local_orden, "BL con orden"),
-            (busqueda_local_orden_mut2, "BL con orden y otra mutación")
+            (busqueda_local_orden_mut2, "BL con orden y otra mutación"),
+            (agg_blx_mut2, "AGG_BLX_MUT2"),
+            (age_blx_mut2, "AGE_BLX_MUT2"),
+            (age_ca_alt, "AGE_CA_ALT"),
+            (am_afinidad_01, "AM-(10,0.1,af)")
         ];
     for algoritmo in &lista_algoritmos {
         println!("\n{} sobre los datos en {}...", algoritmo.1, archivo);
