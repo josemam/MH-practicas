@@ -1,0 +1,563 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage[spanish,es-tabla]{babel}
+\usepackage{amsmath,amsthm}
+\usepackage{xfrac}
+\usepackage{graphicx, float}
+\usepackage{adjustbox} % Permite detallar el tamaño de las tablas
+\usepackage{amssymb}
+\usepackage{enumitem}
+\usepackage{wrapfig}
+\usepackage{import}
+\usepackage[dvipsnames]{xcolor}
+\usepackage[spanish,onelanguage]{algorithm2e} % Pseudocódigo
+\usepackage[colorlinks,linkcolor=BrickRed,urlcolor=Blue]{hyperref} % URLs, referencias a tablas
+\usepackage{mathpazo} % Palatino font
+\usepackage{multirow} % Múltiples filas por celda
+
+\DeclareMathOperator*{\argmin}{argmin}
+
+% Entorno para controlar el espacio antes y después de un algoritmo
+\newenvironment{algo}{
+	\vspace*{0.5cm}
+	\begin{algorithm}[H]}{
+	\end{algorithm}
+	\vspace*{0.5cm}
+}
+\SetKwBlock{Repeatn}{repetir}{}
+
+% ///////////////////////////////////////////////////////////////////////////////////////
+% Se ha usado la plantilla https://www.latextemplates.com/template/academic-title-page
+% Autoría de la plantilla
+% WikiBooks (LaTeX - Title Creation) with modifications by:
+% Vel (vel@latextemplates.com)
+%
+% Licencia de la plantilla:
+% CC BY-NC-SA 3.0 (http://creativecommons.org/licenses/by-nc-sa/3.0/)
+% ///////////////////////////////////////////////////////////////////////////////////////
+
+\begin{document}
+
+\begin{titlepage} % Suppresses displaying the page number on the title page and the subsequent page counts as page 1
+	\newcommand{\HRule}{\rule{\linewidth}{0.5mm}} % Defines a new command for horizontal lines, change thickness here
+	
+	\center % Centre everything on the page
+	
+	%------------------------------------------------
+	%	Headings
+	%------------------------------------------------
+	
+	\textsc{\LARGE Universidad de Granada}\\[1.5cm] % Main heading such as the name of your university/college
+	
+	\textsc{Metaheurísticas}\\[0.3cm] % Major heading such as course name
+	
+	\textsc{Curso 2017-2018}\\[0.5cm] % Minor heading such as course title
+	
+	%------------------------------------------------
+	%	Title
+	%------------------------------------------------
+	
+	\HRule\\[0.4cm]
+	{\huge\bfseries Práctica 2: Técnicas de Búsqueda basadas en Poblaciones}\\[0.4cm] % Title of your document
+	
+	\HRule\\[1.5cm]
+	
+	\textsc{Aprendizaje de Pesos en Características}\\[0.5cm]
+	
+	\vfill
+
+	\textsc{José Manuel Muñoz Fuentes}\\
+	\input{DNI.txt}\\
+	\texttt{jmlosvillares@correo.ugr.es}\\
+	{\footnotesize\textsc{Grupo de prácticas 2 (martes 17:30 - 19:30)}}
+
+	\vfill\vfill\vfill % Position the date 3/4 down the remaining page
+	
+	{\large\today} % Date, change the \today to a set date if you want to be precise
+
+	\vfill\vfill
+	\includegraphics[width=0.2\textwidth]{ugr.png}\\[1cm] % Include a department/university logo - this will require the graphicx package
+	
+	%----------------------------------------------------------------------------------------
+	
+	\vfill % Push the date up 1/4 of the remaining page
+	
+\end{titlepage}
+\tableofcontents
+
+\include{descripcion}
+
+\section{Aspectos comunes a los algoritmos basados en poblaciones}
+
+Muchas de las partes de los algoritmos genéticos y meméticos se apoyan en el trabajo realizado en la práctica anterior, como la representación de soluciones, la función objetivo, el operador de mutación (que es el operador de vecino de la práctica anterior) y la obtención de una solución aleatoria.
+
+
+\subsection{Aspectos tomados de otros algoritmos}
+
+Las soluciones o cromosomas se representan como tuplas de pesos con tantas componentes como el número de características observadas en la muestra. Cada peso $w_i$ se almacena como un valor real en $[0,\,1]$, de forma que la distancia entre dos datos $\normalfont \textbf x$ y $\normalfont \textbf d$ se calculará como $\sum_i \delta(w_i)(x_i - d_i)^2$, donde $\delta(x) = 0$ si $x < 0.2$ y $\delta(x) = x$ en caso contrario. Así, los pesos menores que $0.2$ en una solución son considerados nulos en el cálculo de la distancia entre dos datos. \\
+
+La función objetivo, que evalúa un cromosoma o vector de pesos $\textbf w$ sobre un conjunto de entrenamiento $T$, se describe a continuación. Su desarrollo está más completo en la memoria de la práctica anterior.
+
+\begin{algo}
+	\KwIn{$\normalfont \textbf w = \{w_1,\ ...,\ w_N\}$ tupla de pesos, $T$ conjunto de entrenamiento}
+	\KwOut{Valoración de la solución}
+	
+	$V_1 := 0$\;
+	$V_2 := 0$\;
+	\ForAll{$\normalfont \textbf d \in T$} {
+		$\normalfont \textbf x := nearest(\normalfont \textbf d, T \setminus \{ \normalfont \textbf d \}, \normalfont \textbf w)$\;
+		\lIf{$clase(\normalfont \textbf x) = clase(\normalfont \textbf d)$}{
+			$V_1 := V_1 + 1$
+		}	
+	}
+	\ForAll{$i$ \textnormal{\textbf{desde}} $1$ \textnormal{\textbf{hasta}} $N$} {
+		\lIf{$w_i < 0.2$}{
+			$V_2 := V_2 + 1$
+		}
+	}
+	\KwRet{$\displaystyle \frac {V_1} {|T|} + \frac {V_2} N$}
+	\vspace{0.2cm}
+	\caption{Función objetivo, donde $clase$ es una función que devuelve la clase de un dato (que es conocida porque $T$ es un conjunto de entrenamiento) y $nearest$ es la función que encuentra el dato más cercano según la distancia definida en la memoria de la práctica $1$.}
+\end{algo}
+
+\newpage
+La obtención de una solución aleatoria se efectúa así:
+
+\begin{algo}
+	\KwIn{$N$ número de componentes}
+	\KwOut{$\normalfont \textbf w_r$ solución aleatoria}
+	\ForAll{$i$ \textnormal{\textbf{desde}} $1$ \textnormal{\textbf{hasta}} $N$}{
+		$(\normalfont \textbf w_r)_i := Uniforme(0,\, 1)$
+	}
+	\KwRet{$\normalfont \textbf w_r / \max_{i = \{ 1,\ ...,\ N \}} (\normalfont \textbf w_r)_i$}
+	\vspace{0.2cm}
+	\caption{Algoritmo de obtención de una solución aleatoria de $N$ componentes. $Uniforme(0,\, 1)$ es una función que devuelve un número siguiendo una distribución uniforme entre $0$ y $1$. Los algoritmos para esta práctica ejecutarán este procedimiento $30$ veces para obtener $30$ soluciones iniciales.}
+\end{algo}
+
+La operación de mutación es distinta según se efectúe en un algoritmo genético generacional o estacionario: como se ve en sus respectivas secciones, \hyperref[mutar-pob]{en el generacional} se efectúa el número de mutaciones esperado y se genera al azar el cromosoma y gen afectados, y \hyperref[mutar-cr]{en el estacionario} se decide en cada gen si hay mutación o no. En ambos casos la operación básica de mutación es el operador de vecino propuesto en la práctica 1 para la búsqueda local $Vecino(\textbf w,\, i)$, que muta la componente $i$-ésima de $\textbf w$. \\
+
+Se ha corregido el error que tenía este operador en el material entregado para la práctica 1: faltaba normalizar el vector si se había modificado la componente con valor $1$ a un valor menor. Ahora se corresponde con el siguiente esquema:
+
+\begin{algo}
+	\KwIn{$\normalfont \textbf w$ solución (es decir, pesos), $i$ posición}
+	\KwOut{$\normalfont \textbf w_n$ solución vecina a $\normalfont \textbf w$}
+	
+	$\normalfont \textbf w_n := \normalfont \textbf w$\;
+	ERA-1 $:= (\normalfont \textbf w_n)_i = 1$\;
+	$(\normalfont \textbf w_n)_i := (\normalfont \textbf w_n)_i + Normal(0,\, 0.3)$\;
+	\lIf{$(\normalfont \textbf w_n)_i < 0$}{
+		$(\normalfont \textbf w_n)_i := 0$
+	}\lElseIf{$(\normalfont \textbf w_n)_i > 1$}{
+		$(\normalfont \textbf w_n)_i := 1$
+	}
+	\lIf{ERA-1 y $(\normalfont \textbf w_n)_i \neq 1$}{
+		$\normalfont \textbf w_n := \normalfont \textbf w_n/\max_{i = \{ 1,\ ...,\ N \}} (\normalfont \textbf w_n)_i$
+	}
+	\KwRet{$\normalfont \textbf w_n$}
+	\vspace{0.2cm}
+	\caption{Algoritmo de obtención de solución vecina mutando la componente $i$-ésima. $Normal(0,\, 0.3)$ es una función que devuelve un número siguiendo una distribución normal de media $0$ y desviación típica $0.3$.}
+\end{algo}
+
+Como se verá más adelante, esto ha afectado de forma no despreciable pero tampoco sustancial a los resultados de la búsqueda local, que usa este operador de vecino.
+
+\subsection{Novedades de los algoritmos basados en poblaciones}
+
+Los algoritmos genéticos comparten un proceso básico de \textit{selección del mejor cromosoma} consistente en elegir de un conjunto de dos cromosomas el de mayor valoración según la función objetivo, eligiendo uno cualquiera en caso de empate. También usan procedimientos de selección del mejor o peor cromosoma en un conjunto de mayor tamaño, operación que se sigue efectuando a través del orden generado por la función objetivo. \\
+
+Se han propuesto dos operadores de cruce: BLX-0.3 y cruce aritmético CA. Ambos devuelven un conjunto de cromosomas a partir de un par de padres.
+
+\begin{algo}
+	\KwIn{$\normalfont \textbf w_1, \normalfont \textbf w_2$ cromosomas}
+	\KwOut{Conjunto de cromosomas hijos $S$}
+	
+	$S := \emptyset$\;
+	\Repeatn{
+		$h := (0,\,...,\,0)$\;
+		\For{$i$ \textnormal{\textbf{desde}} $0$ \textnormal{\textbf{hasta}} $|\textbf w_1|-1$}{
+			$I := |(\textbf w_1)_i - (\textbf w_2)_i| \cdot 0.3$\;
+			$c_1 := \min\{(\textbf w_1)_i ,\, (\textbf w_2)_i \} - I$\;
+			$c_2 := \max\{(\textbf w_1)_i ,\, (\textbf w_2)_i \} + I$\;
+			$h_i := Uniforme(c_1,\,c_2)$\;
+			\lIf{$h_i < 0$}{
+				$h_i := 0$
+			}\lElseIf{$h_i > 1$}{
+				$h_i := 1$
+			}
+		}
+		$h := h / \max_i h_i$\tcc*[r]{Se normaliza $h$}
+		\textbf{Insertar} $h$ en $S$\;
+	} $2$ veces\;
+	
+	\KwRet{$S$}
+	\vspace{0.2cm}
+	\caption{Operador de cruce BLX-0.3. $Uniforme(c_1,\ c_2)$ es una función que devuelve un número siguiendo una distribución uniforme entre $c_1$ y $c_2$. Se ha decidido truncar a $[0,\,1]$ el gen después de generar el número aleatorio; se podría haber truncado el rango de $a$ y $b$ en su lugar.}
+\end{algo}
+
+\vspace{-0.45cm}
+\begin{algo}
+	\KwIn{$\normalfont \textbf w_1, \normalfont \textbf w_2$ cromosomas}
+	\KwOut{Conjunto de cromosomas hijos (de cardinal $1$)}
+
+	$h := (0,\,...,\,0)$\;
+	\For{$i$ \textnormal{\textbf{desde}} $0$ \textnormal{\textbf{hasta}} $|\textbf w_1|-1$}{
+		$h_i := \frac{(\textbf w_1)_i + (\textbf w_2)_i}{2}$\;
+	}
+	$h := h / \max_i h_i$\tcc*[r]{Se normaliza $h$}
+
+	\KwRet{$\{h\}$}
+	\vspace{0.2cm}
+	\caption{Operador de cruce aritmético, CA.}
+\end{algo}
+
+\newpage
+\section{Algoritmo genético generacional}
+
+El esquema de los algoritmos genéticos generacionales (que supondrá gran parte de la estructura de los algoritmos meméticos) es el que se presenta a continuación.
+
+\begin{algo}
+	\KwOut{cromosoma solución (un vector de pesos $\normalfont \textbf w$)}
+	
+	$Pob :=$ conjunto de $30$ soluciones aleatorias\;
+	
+	\While{no se ha llegado al tope de evaluaciones de la función objetivo}{
+		$NewPob := []$\tcc*[r]{Es un vector, no un conjunto como $Pob$}
+		\While{$|NewPob| < |Pob|$}{
+			$ShufflePob :=$ permutación de $Pob$\;
+			\Repeatn{
+				$Grupo :=$ \textbf{extraer} los $4$ primeros cromosomas de $ShufflePob$\;
+				$c1 :=$ el mejor de los dos primeros cromosomas de $Grupo$\;
+				$c2 :=$ el mejor de los dos últimos cromosomas de $Grupo$\;
+				$hijos :=$ $Cruzar(c1, c2)$\tcc*[r]{Es un conjunto}
+				\textbf{Insertar} los elementos del conjunto $hijos$ en $NewPob$\;
+				\lIf{$|hijos| = 1$}{
+					\textbf{Insertar} $c2$ en $NewPob$
+				}
+			} tantas veces como el redondeo de ($\frac {30} 4 $ veces la tasa de cruce)\;
+			\While{$ShufflePob \neq \emptyset$}{
+				$Par :=$ \textbf{extraer} los dos primeros elementos de $ShufflePob$\;
+				\textbf{Insertar} el mejor elemento de $Par$ en $NewPob$\;
+			}
+			
+		}
+		$NewPob :=$ \hyperref[mutar-pob]{\textbf{MutarPoblacion}}$(NewPob)$\;
+		$OldPob := Pob$\;
+		$Pob := NewPob$\tcc*[r]{Se introducen los cromosomas del vector $NewPob$ en el conjunto $Pob$}
+		\textbf{Insertar} el mejor elemento de $OldPob$ en $Pob$\tcc*[r]{Elitismo}
+		\If(\tcc*[h]{El mejor cromosoma no estaba}){$|Pob| > 30$}{
+			\textbf{Eliminar} el peor elemento de $Pob$\;
+		}
+		\While(\tcc*[h]{Había repetidos en $NewPob$}){$|Pob| < 30$}{
+			\textbf{Insertar} en $Pob$ el mejor elemento de $OldPob$ que no esté en $Pob$\;
+		}
+	}
+	
+	\KwRet{el mejor cromosoma de $Pob$}
+	\vspace{0.2cm}
+	\caption{Estructura del algoritmo genético generacional.}
+	\label{AGG}
+\end{algo}
+
+En cada generación, para rellenar el vector de cromosomas se obtiene una permutación de la población en la generación anterior, se agrupan los cromosomas en parejas y se selecciona el mejor (el de mayor evaluación de la función objetivo) de cada pareja. Dado que la tasa de cruce es $0.7$, los primeros $0.7 \cdot 15$ cromosomas resultantes (redondeando al entero más próximo) se vuelven a agrupar en parejas y se sustituyen por el resultado de cruzar los cromosomas con un cierto operador de cruce $Cruzar$ (que devuelve un conjunto de cromosomas; si el operador devuelve un único cromosoma, como es el caso del operador de cruce aritmético, solo se sobreescribe uno de los padres). El resto de cromosomas seleccionados se mantienen en la nueva población. Este procedimiento solo da $15$ hijos, por lo que se repite y ya se obtiene un vector de $30$ cromosomas. \\
+
+Una vez que se obtiene el vector de nuevos cromosomas, se muta con el procedimiento descrito en el seminario 3, que es el siguiente (donde $Vecina(\textbf w,\,j)$ es el operador de mutación, que coincide con el de obtención de una solución vecina en la búsqueda local y lo que hace es mutar la componente $j$-ésima del cromosoma $\textbf w$):
+
+\begin{algo}
+	\label{mutar-pob}
+	\KwIn{$Pob$ vector de cromosomas}
+	\KwOut{$Pob$ vector de cromosomas mutado}
+
+	\Repeatn{
+		$i =$ índice aleatorio en el vector $Pob$\;
+		$j =$ índice aleatorio en el cromosoma $Pob_i$\;
+		$Pob_i := Vecina(Pob_i, j)$\;
+	} tantas veces como el número de mutaciones esperado\;
+
+	\KwRet{$Pob$}
+	\vspace{0.2cm}
+	\caption{Proceso de mutación \textbf{MutarPoblacion} de una población en el algoritmo genético generacional.}
+\end{algo}
+
+
+Después se sustituye la población anterior por la nueva, insertando de nuevo el mejor cromosoma de la generación anterior. $Pob$ es un conjunto mientras que $NewPob$ es un vector, luego, en caso de haber elementos repetidos en $NewPob$, no se encontrarán más de una vez en $Pob$. Si tras el resultado hay $31$ individuos porque el mejor cromosoma de la generación anterior no se ha conservado, se elimina el peor cromosoma de la nueva población. Si se tienen menos de $30$, se van insertando los mejores cromosomas de la generación anterior hasta que se llegue a $30$. Este proceder evita la repetición exacta de cromosomas, aunque la elección de los mejores cromosomas en caso de repetición puede precipitar la convergencia de la población.
+
+\section{Algoritmo genético estacionario}
+
+Los algoritmos genéticos de variante estacionaria se rigen por el siguiente procedimiento:
+
+\begin{algo}
+	\KwOut{cromosoma solución (un vector de pesos $\normalfont \textbf w$)}
+	
+	$Pob :=$ vector de $30$ soluciones aleatorias\;
+	
+	\While{no se ha llegado al tope de evaluaciones de la función objetivo}{
+		$i, j, k, l :=$ índices aleatorios en el vector $Pob$\;
+		$a :=$ índice del mejor cromosoma entre $Pob_i$ y $Pob_j$\;
+		$b :=$ índice del mejor cromosoma entre $Pob_k$ y $Pob_l$\;
+		$hijos :=$ $Cruzar(Pob_a, Pob_b)$\tcc*[r]{Es un conjunto}
+		\ForEach{$h \in hijos$}{
+			$h :=$ \hyperref[mutar-cr]{\textbf{MutarCromosoma}}$(h)$\;
+			\If{$h$ tiene mayor valoración que el peor cromosoma en $Pob$ $w$}{
+				\textbf{Reemplazar $w$ por $h$}
+			}
+		}
+	}
+	
+	\KwRet{el mejor cromosoma de $Pob$}
+	\vspace{0.2cm}
+	\caption{Estructura del algoritmo genético estacionario.}
+\end{algo}
+
+En cada paso se seleccionan cuatro cromosomas y se cruza el mejor de los dos primeros con el mejor de los dos últimos, se mutan los hijos y se introducen en la población si no son peores que todos los demás cromosomas de la población, reemplazando al peor. \\
+
+No se especifica si la elección de índices aleatorios es con o sin reemplazamiento, es decir, de forma que un mismo índice se pueda seleccionar más de una vez o no. En la implementación se ha optado por un procedimiento con reemplazamiento por ser el más fácil de programar, pero en caso de que los padres elegidos tengan el mismo índice (es decir, sean el mismo), para evitar que el hijo sea probablemente una copia idéntica de los padres y se repita el cromosoma (porque los operadores de cruce sugeridos dan siempre el mismo individuo que los padres si estos son iguales) se ha multiplicado por $100$ la tasa de mutación por gen para cada hijo (pasando de $0.001$ a $0.1$), de forma que se potencia la exploración a la vez que se evita la duplicación de cromosomas. \\
+
+El procedimiento de mutación es distinto al aplicado en el algoritmo genético generacional, dado que aquí no podemos aplicar en cada paso la tasa esperada de mutaciones (que es $0$ para dimensiones menores que $1000$ del espacio de características, cosa que sucede en todos los conjuntos de datos que se han usado). En su lugar se comprueba la mutación o no de cada uno de los genes por separado: \\
+
+\begin{algo}
+	\label{mutar-cr}
+	\KwIn{$\textbf w$ cromosoma}
+	\KwOut{$\textbf w$ cromosoma mutado}
+	
+	\ForEach(\tcc*[h]{Por cada gen de $\normalfont \textbf w$}){$j \in \{0,\, ...,\, size(\normalfont \textbf w)-1\}$}{
+		\If{un número aleatorio en $[0,\,1]$ es menor que la tasa de mutación}{
+			$\textbf w := Vecina(\textbf w, j)$\tcc*[r]{Se muta el gen $j$-ésimo de $\normalfont \textbf w$}
+		}
+	}
+	
+	\KwRet{$\normalfont \textbf w$}
+	\vspace{0.2cm}
+	\caption{Proceso de mutación \textbf{MutarCromosoma} de un cromosoma en el algoritmo genético estacionario.}
+\end{algo}
+
+\vspace{-0.2cm}
+\section{Algoritmos meméticos}
+
+Los algoritmos meméticos se plantean como una variante de los algoritmos genéticos de modelo generacional en donde, al final de cada generación (es decir, al final del bucle más externo del algoritmo), es posible efectuar un procedimiento de optimización local sobre algunos de los cromosomas de la población. \\
+
+En todos los algoritmos meméticos propuestos, el procedimiento de optimización local se aplica cada $10$ generaciones y es la búsqueda local de la práctica anterior con una condición de parada distinta. Usarán el operador de cruce que mejores resultados da (se verá más adelante que es BLX).
+
+\begin{algo}
+	\KwIn{$\normalfont \textbf w$ agente (vector de pesos de longitud $N$)}
+	\KwOut{$\normalfont \textbf w_n$ nuevo agente}
+	
+	$\normalfont \textbf w_n := \normalfont \textbf w$\;
+	\While{el nº de evaluaciones de la función objetivo es menor que $2 N$}{
+		\ForAll{$i$ \textnormal{\textbf{desde}} $0$ \textnormal{\textbf{hasta}} $N-1$}{
+			$\normalfont \textbf w_c := Vecina(\normalfont \textbf w,\ i)$\;
+			\If{$\normalfont \textbf w_c$ tiene mayor valoración por la función objetivo que $\normalfont \textbf w_n$}{
+				$\normalfont \textbf w_n := \normalfont \textbf w_c$\;
+				\textbf{Salir} del bucle interno\;
+			}
+		}
+	}
+	
+	\KwRet{$\normalfont \textbf w_n$}
+	\vspace{0.2cm}
+	\caption{Algoritmo de exploración del entorno de un único agente (cromosoma) a través de la búsqueda local descrita para la práctica 1.}
+\end{algo}
+
+\newpage
+Se presentan tres posibles procedimientos a ejecutar al final de una de cada $10$ generaciones sobre los agentes de la población $Pob$:
+
+\begin{itemize}
+	\item Reemplazar cada agente de $Pob$ por el resultado de aplicarle optimización local: AM-(10, 1.0).
+	\item Para cada agente de $Pob$, obtener un número aleatorio en $[0,\,1]$ y si es menor que $0.1$ reemplazarlo por el resultado de aplicarle optimización local: AM-(10, 0.1).
+	\item Estando $Pob$ ordenado de mayor a menor según la función objetivo, tomar el primer diez por ciento de los agentes (en esta práctica esto consistirá en tomar los $\frac {30}{10} = 3$ de mayor valoración) y reemplazar cada uno por el resultado de aplicarle optimización local: AM-(10, 0.1mej).
+\end{itemize}
+
+
+\section{Algoritmos de comparación}
+
+Se comparará el resultado de los algoritmos propuestos en el guion con los resultados obtenidos con los algoritmos pedidos en el guion de la práctica 1: \textbf{1NN}, \textbf{RELIEF} y búsqueda local \textbf{BL}. Para más información sobre estos algoritmos consúltese la memoria de la práctica 1. \\
+
+Como se comentó en la descripción del \hyperref[mut]{operador de mutación}, se ha corregido el operador de vecino utilizado por la búsqueda local BL. En los experimentos se puede observar un resultado ligeramente superior de la búsqueda local después de hacer este cambio, pero no invalida las conclusiones obtenidas.
+
+También se compararán los resultados con los obtenidos con los algoritmos adicionales propuestos en la siguiente sección, tanto los presentados en esta práctica como los que fueron propuestos en la anterior.
+
+\section{Algoritmos adicionales}
+
+Los algoritmos RELIEF más truncado \textbf{RELIEF+tr}, RELIEF más potenciación \textbf{RELIEF+pw} y búsqueda local con un operador de mutación alternativo y/o con ordenación de atributos \textbf{BL-mut2}, \textbf{BL-ord} y \textbf{BL-ord-mut2} fueron algoritmos adicionales propuestos para la práctica 1, y su descripción se omitirá puesto que se encuentra en la memoria correspondiente. \\
+
+Las combinaciones de RELIEF con un algoritmo de búsqueda local pensado para aprovechar la puntuación extra que se obtiene si se utilizan menos pesos resultaron dar las mejores puntuaciones en la práctica anterior. Se propondrá una versión adicional que ofrece resultados ligeramente superiores: RELIEF + afinidad \textbf{RELIEF+af}. El procedimiento es similar a las otras combinaciones de RELIEF con una búsqueda local: para cada característica se aplica a todo el vector la transformación afín (o afinidad) que tiene por punto fijo el $1$ y lleva el valor de la característica a un número poco menor que $0.2$, de forma que esa característica y aquellas cuyo peso asignado sea menor quedan anuladas.
+
+\begin{algo}
+	\KwIn{$\normalfont \textbf w$ solución (es decir, $N$ pesos), $i$ posición}
+	\KwOut{$\normalfont \textbf w_n$ solución vecina a $\normalfont \textbf w$ o NADA}
+	
+	\lIf{$w_i = 0.0$ o $w_i = 1$}{
+		\KwRet{NADA}
+	}
+	$c := w_i + 0.0000001$\tcc*[r]{Este valor será llevado a $0.2$}
+	$\normalfont \textbf w_n := \normalfont \textbf w$\;
+	\ForAll{$j$ \textnormal{\textbf{desde}} $1$ \textnormal{\textbf{hasta}} $N$}{
+		$(w_n)_j := \frac{0.8 \cdot (w_n)_j - c + 0.2}{1 - c}$\;
+		\lIf{$(w_n)_j < 0$}{
+			$(w_n)_j := 0$
+		}\lElseIf{$(w_n)_j > 1$}{
+			$(w_n)_j := 1$
+		}
+	}
+	\KwRet{$\normalfont \textbf w_n$}
+	\vspace{0.2cm}
+	\caption{Operador de vecino por afinidad. El algoritmo que aplica este operador al resultado de RELIEF en cada componente y se queda con la solución de mayor función objetivo que encuentre se notará \textbf{RELIEF+af}}
+\end{algo}
+
+Al igual que el resto de algoritmos del estilo, RELIEF+af trata de reducir la complejidad de la solución de RELIEF sin que baje considerablemente la tasa de clasificación que ofrece. \\
+
+Se proponen también variantes adicionales de los algoritmos genéticos y meméticos. En primer lugar se propone recuperar el operador de mutación alternativo, que se diferencia del operador de vecino de la práctica $1$ en que, si al mutar una componente toma un valor mayor que $1$, en lugar de truncar la componente normaliza el vector, facilitando que otros pesos bajen de $0.2$:
+
+\begin{algo}
+	\KwIn{$\normalfont \textbf w$ solución (es decir, pesos), $i$ posición}
+	\KwOut{$\normalfont \textbf w_n$ solución vecina a $\normalfont \textbf w$}
+	$\normalfont \textbf w_n := \normalfont \textbf w$\;
+	ERA-1 $:= (\normalfont \textbf w_n)_i = 1$\;
+	$(\normalfont \textbf w_n)_i := (\normalfont \textbf w_n)_i + Normal(0,\, 0.3)$\;
+	\lIf{$(\normalfont \textbf w_n)_i < 0$}{
+		$(\normalfont \textbf w_n)_i := 0$
+	}
+	\lIf{ERA-1 o $(\normalfont \textbf w_n)_i > 1$}{
+		$\normalfont \textbf w_n := \normalfont \textbf w_n/\max_{i = \{ 1,\ ...,\ N \}} (\normalfont \textbf w_n)_i$
+	}
+	\KwRet{$\normalfont \textbf w_n$}
+	\vspace{0.2cm}
+	\caption{Operador alternativo de mutación de la componente $i$-ésima. $Normal(0,\, 0.3)$ es una función que devuelve un número aleatorio siguiendo una distribución normal de media $0$ y desviación típica $0.3$.}
+\end{algo}
+
+La búsqueda local de la práctica 1 utilizando este operador de vecino en lugar del propuesto en el guion se llamaba \textbf{BL-mut2} (también había otro procedimiento de búsqueda local que además de usar este operador de vecino ordenaba las características, llamado \textbf{BL-ord-mut2}). Este operador también se utilizará como operador alternativo de mutación, constituyendo el algoritmo genético generacional \textbf{AGG-BLX-mut2} y el genético estacionario \textbf{AGE-BLX-mut2}, que utilizan el operador de cruce BLX porque es el que mejor resultado ha dado en general, como se verá en la experimentación. \\
+
+Se probará también un operador de cruce alternativo CA-ALT, similar al cruce aritmético CA pero en el que cada componente que en un padre tome un valor por debajo del umbral $0.2$ pero en la combinación aritmética tome un valor superior a $0.2$ tiene una probabilidad del diez por ciento de tomar el valor que tiene en el padre donde el valor está por debajo del umbral. De esta forma se potencia la búsqueda de soluciones con más pesos por debajo del umbral, persiguiendo así soluciones más simples. Con este operador de cruce se constituye el algoritmo genético estacionario \textbf{AGE-CA-ALT}. A continuación se muestra el pseudocódigo del operador:
+
+\begin{algo}
+	\KwIn{$\normalfont \textbf w_1, \normalfont \textbf w_2$ cromosomas}
+	\KwOut{Conjunto de cromosomas hijos (de cardinal $1$)}
+	
+	$h := (0,\,...,\,0)$\;
+	\For{$i$ \textnormal{\textbf{desde}} $0$ \textnormal{\textbf{hasta}} $|\textbf w_1|-1$}{
+		$m_i := \min\{ (\textbf w_1)_i,\, (\textbf w_2)_i \}$\;
+		$h_i := \frac{(\textbf w_1)_i + (\textbf w_2)_i}{2}$\;
+		\If{$h_i \geq 0.2$ y $m_i < 0.2$}{
+			\lIf{$Uniforme(0,\, 1) < 0.1$}{$h_i := m_i$}
+		}
+	}
+	$h := h / \max_i h_i$\tcc*[r]{Se normaliza $h$}
+	
+	\KwRet{$\{h\}$}
+	\vspace{0.2cm}
+	\caption{Operador de cruce aritmético alternativo, CA-ALT. $Uniforme(0,\, 1)$ es una función que devuelve un número siguiendo una distribución uniforme entre $0$ y $1$.}
+\end{algo}
+
+Por último, se probará a utilizar un algoritmo memético similar a AM-(10,0.1) (es decir, cada diez generaciones aplica búsqueda local a cada cromosoma con probabilidad $0.1$) pero utilizando la búsqueda local que proporciona el operador de vecino por afinidad, descrito en esta sección. \\
+
+La corrección del error en el operador de vecino de la práctica 1 ha supuesto modificaciones (no sustanciales) en las puntuaciones obtenidas por el procedimiento BL-ord de la práctica 1.
+
+\section{Descripción de la implementación}
+
+\subsection*{Aspectos comunes a la anterior entrega}
+
+Se ha optado por realizar la práctica como un proyecto en el lenguaje de programación Rust, utilizando código de elaboración propia para todas las operaciones salvo la lectura de archivos ARFF, para la que se ha optado por utilizar código de otro proyecto. \\
+
+El código fuente de un proyecto Rust se almacena en una carpeta \texttt{src} que contiene ficheros de extensión \texttt{.rs} y carpetas.
+
+\begin{itemize}
+	\item En el archivo \texttt{knn/arff.rs} se implementa un lector de archivos ARFF procedente de \href{https://github.com/gyscos/varf}{este proyecto de GitHub}. Si fuese un paquete de Rust aislado se habría importado, pero incluir el paquete completo que lo contiene añadiría muchas dependencias y se ha optado por copiar la parte del código que interesa.
+	\item \texttt{knn/mod.rs} implementa el clasificador 1-NN con pesos. Para ello incluye la definición de la estructura \texttt{Dato}, cuyas instancias representan uno de los datos de una muestra; la implementación de la función distancia con pesos entre instancias de \texttt{Dato} en \texttt{distancia\_cuadrado}, funciones para obtener el elemento con menor distancia a un \texttt{Dato} en un conjunto de elementos \texttt{Dato} y un método que obtiene los datos en el formato de \texttt{Dato} a partir de la menos manejable estructura que se genera en \texttt{arff.rs}, elimina los datos repetidos y los normaliza para que cada característica abarque el rango $[0,\,1]$. \\ Está preparado para funcionar con variables categóricas además de variables reales, pero no se usa esta funcionalidad.
+	\item El archivo \texttt{evaluacion\_pesos.rs} contiene diversas funciones con las que evaluar clasificadores (o pesos). Incluye funciones para obtener los estadísticos \texttt{tasa\_clas} y \texttt{tasa\_red} y una función que implementa el procedimiento \textit{$5$-fold cross validation} e imprime los resultados en pantalla.
+	\item En \texttt{funciones\_practica2.rs} (y \texttt{funciones\_practica1.rs}) se definen los algoritmos realizados para la práctica 2 (y 1).
+	\item En \texttt{practica2.rs} (y \texttt{practica1.rs}) se define una función \texttt{main} que ejecuta los algoritmos para el conjunto de datos definido en un archivo ARFF recibido como parámetro utilizando como semilla del RNG una cadena de texto, o, si no se indica ningún archivo, para los tres conjuntos de datos ofrecidos (se asumirá que se encuentran en la carpeta \texttt{instances}).
+\end{itemize}
+
+Se ha utilizado como generador de números pseudoaleatorios una implementación de \href{http://www.burtleburtle.net/bob/rand/isaac.html}{\texttt{ISAAC-64}} que está incluida en el paquete \texttt{rand} de Rust. La elección de un RNG concreto permite obtener los mismos resultados a partir de la misma semilla en cualquier máquina en la que se ejecute el programa. El algoritmo es criptográficamente seguro, aunque en la \href{https://docs.rs/rand/0.4.2/rand/struct.Isaac64Rng.html}{documentación} de la estructura que implementa \texttt{ISAAC-64} en Rust no garantizan que esta implementación lo sea. También tiene períodos muy largos que aumentan con el tamaño de la semilla, que es una lista de enteros de $64$ bits de longitud arbitraria. \\
+
+El gestor de paquetes de Rust, llamado \textit{cargo}, permite compilar de forma cómoda el proyecto, descargando y compilando las dependencias automáticamente. Para compilar el proyecto hay que usar \texttt{cargo build}, pudiendo usar el parámetro \texttt{--release} para aplicar optimización de código. El programa se almacenará en \texttt{target/build}, o \texttt{target/release} si se ha utilizado el parámetro \texttt{--release}. Si en lugar de \texttt{build} el argumento es \texttt{run}, el programa se ejecuta además de ser compilado. \\
+
+Para probar el programa con los tres archivos de datos de la práctica basta llamar al programa sin argumentos mientras se tiene como directorio actual la carpeta que contiene \texttt{instances}, que es la carpeta que debe contener los tres archivos de datos. Si se le pasa la ruta a un archivo como un argumento, intenta leer los datos de este archivo. A través del parámetro \texttt{-s} o \texttt{--seed} se puede introducir una cadena de texto, que debe estar entre comillas si contiene espacios, de la que se extraerá una semilla para el RNG. Nótese que el programa no está preparado para comprobar si el archivo que recibe como parámetro es un ARFF o no: su comportamiento está indeterminado si recibe un archivo que no es un ARFF.
+
+\subsection*{Novedades}
+
+Se ha conseguido una evaluación más rápida de la función objetivo modificando el iterador usado en el cálculo de la distancia entre datos (funciones \texttt{distancia\_cuadrado\_vc} y \texttt{distancia\_cuadrado\_vf} en \texttt{knn/mod.rs}), utilizado la macro \texttt{izip!} en lugar de la función \texttt{multizip}. Al ser la operación que más tiempo ocupa en todos los algoritmos que no son 1NN ni RELIEF, el tiempo de ejecución de prácticamente todos los algoritmos se ha reducido notoriamente, con el inesperado resultado de que la mejora en el PC donde se han ejecutado los experimentos ha sido menos notable que en aquel donde se ha desarrollado la práctica (un portátil con un procesador \href{https://ark.intel.com/es-es/products/75459/Intel-Core-i5-4200U-Processor-3M-Cache-up-to-2_60-GHz}{Intel® Core™ i5-4200U a 1,60 GHz} con 16 GB de RAM sobre Windows 8.1) y el más rápido en ejecutar el programa ha pasado de ser el primero a ser este último, como se observa en la siguiente tabla. Podría deberse a la disponibilidad del conjunto de instrucciones vectoriales AVX2, o a la falta de acceso al set AVX en el PC donde se ejecutaba el programa por ser incompatible con el sistema operativo Windows 7. A pesar de esto, al ofrecer tiempos de ejecución más estables, se ha mantenido el mismo PC para obtener los resultados.
+
+\begin{table}[H]
+	\centering
+	\def\arraystretch{1.27}
+	\begin{tabular}{c r r r r}
+	\cline{2-5}
+	 & \multicolumn{2}{c}{\texttt{multizip}} & \multicolumn{2}{c}{\texttt{izip!}} \\
+	 & i5-2310 W7 & i5-4200U W8.1 & i5-2310 W7 & i5-4200U W8.1 \\
+		\hline
+		Partición 1 & 25761 & 26179 & 18863 & 12113 \\
+		Partición 2 & 33359 & 34865 & 25915 & 15508 \\
+		Partición 3 & 16878 & 17627 & 13217 &  8055 \\
+		Partición 4 & 17368 & 18758 & 12650 & 11327 \\
+		Partición 5 & 18361 & 17571 & 13059 & 13972 \\
+		\hline
+		Media       & 22345 & 23000 & 16741 & 12195 \\
+	\end{tabular}
+	\caption{Tiempos de ejecución en milisegundos del algoritmo BL-mut2 (que no ha sido cambiado, a diferencia de BL) sobre el conjunto de datos \texttt{ozone-320} en los dos computadores con ambos iteradores.}
+\end{table}
+
+Un aspecto relevante de la implementación son las estructuras de datos utilizadas en los algoritmos genéticos (y meméticos) y la evaluación memorizada de la función objetivo. \\
+
+El algoritmo genético generacional utiliza como contenedor de la población de cromosomas un mapa ordenado cuyas claves son una tupla formada por el opuesto de la evaluación de la función objetivo y un identificador entero del cromosoma, y cuyo valor es el propio cromosoma. Al ser un mapa ordenado de menor a mayor por orden lexicográfico, los primeros cromosomas son los que tienen una mayor evaluación de la función objetivo (y, en caso de empate, el cromosoma más antiguo). Esto permite encontrar el mejor y el peor cromosoma en tiempo constante, y también iterar sobre los cromosomas en orden creciente o decreciente de la función objetivo. \\
+
+Cuando en el algoritmo genético generacional se obtiene una nueva población, el vector que almacena los cromosomas incluye junto con cada cromosoma (es decir, formando una tupla), la evaluación y el identificador (el valor del contador de evaluaciones) del cromosoma si era un cromosoma procedente de la población anterior que no fue recombinado con otro ni mutado, o un valor inválido \texttt{None} en caso contrario. De esta forma, el programa solo tendrá que evaluar los cromosomas verdaderamente nuevos, reemplazando el valor \texttt{None} por un identificador nuevo y la evaluación de la función objetivo del cromosoma. La evaluación de la función objetivo, cuando sea necesaria, se hará justo antes de introducir el nuevo cromosoma en el mapa de la población. Al usar este procedimiento el número de evaluaciones de la función objetivo puede no llegar a ser exactamente $15\,000$ sino un valor ligeramente superior. \\
+
+En el algoritmo genético estacionario se prescinde de una estructura que ordene los cromosomas de la población debido a que el mapa no es adecuado para seleccionar rápidamente cuatro cromosomas aleatorios de la población y a que el tiempo de ejecución del procedimiento no es mayor que el requerido por el algoritmo genético generacional. La población se almacena como un vector, se memoriza la evaluación de cada cromosoma en cuanto se genera y se memoriza la posición del peor cromosoma (el de menor evaluación por la función objetivo), de forma que el programa tiene que buscar secuencialmente el nuevo peor cromosoma cada vez que el que lo era es sobreescrito.
+
+\section{Experimentación}
+
+Para probar los algoritmos se han utilizado los tres conjuntos de datos ofrecidos en la asignatura: \texttt{ozone-320}, \texttt{parkinsons} y \texttt{spectf-heart}. \\
+
+En las pruebas se ha utilizado como semilla la cadena de texto por defecto en el programa, que es esta: ``\texttt{Es el usuario el que elige a la semilla y es la semilla la que quiere que sean los usuarios la semilla.}'' y da lugar a la lista de números enteros sin signo de 64 bits siguiente: \\
+$[5004379230916605299, 8458167372340028780,\ 2337778758777662569,\newline 7450396760082243872,\ 8315172586567524640,\ 8728087622983639328,\newline 8315172586567524640,\ 7809558900510105713,\ 8460404916989489525,\newline 7286951076348960876,\ 8030798249352061298,\ 7597417679491768435,\newline 7308613684687875584]$ \\
+
+Con esta lista de números se inicializó el generador de números aleatorios \texttt{ISAAC64} antes de evaluar cada algoritmo sobre cada uno de los conjuntos de prueba. \\
+
+A continuación se presentan los resultados obtenidos por el programa en cada uno de los algoritmos implementados. El programa ha sido ejecutado en un PC de sobremesa con un procesador \href{https://ark.intel.com/es-es/products/53445/Intel-Core-i5-2310-Processor-6M-Cache-up-to-3_20-GHz}{Intel® Core™ i5-2310 a 2,90 GHz} con 4 GB de RAM sobre un sistema operativo Windows 7.
+
+\newcommand{\resultados}[2]{
+\begin{table}[H]
+	\centering
+	\caption{#2}
+	\def\arraystretch{1.27}
+	\begin{adjustbox}{center, max width=0.7\textwidth}
+		\input{#1.txt}
+	\end{adjustbox}
+\end{table}
+}
+
+\resultados{1-NN}{Resultados obtenidos por el algoritmo 1-NN en el problema del APC}
+\resultados{RELIEF}{Resultados obtenidos por el algoritmo RELIEF en el problema del APC}
+\resultados{BL}{Resultados obtenidos por el algoritmo de búsqueda local en el problema del APC}
+\resultados{AGG-BLX}{Resultados obtenidos por el algoritmo genético generacional con cruce BLX-03 en el problema del APC}
+\resultados{AGG-CA}{Resultados obtenidos por el algoritmo genético generacional con cruce aritmético en el problema del APC}
+\resultados{AGE-BLX}{Resultados obtenidos por el algoritmo genético estacionario con cruce BLX-03 en el problema del APC}
+\resultados{AGE-CA}{Resultados obtenidos por el algoritmo genético estacionario con cruce aritmético en el problema del APC}
+\resultados{AM-(10,1.0)}{Resultados obtenidos por el algoritmo memético (10,1.0) en el problema del APC}
+\resultados{AM-(10,0.1)}{Resultados obtenidos por el algoritmo memético (10,0.1) en el problema del APC}
+\resultados{AM-(10,0.1mej)}{Resultados obtenidos por el algoritmo memético (10,0.1mej) en el problema del APC}
+
+\resultados{RELIEF+tr}{Resultados obtenidos por RELIEF combinado con búsqueda de truncamiento en el problema del APC}
+\resultados{RELIEF+pw}{Resultados obtenidos por RELIEF combinado con búsqueda de exponente en el problema del APC}
+\resultados{RELIEF+af}{Resultados obtenidos por RELIEF combinado con búsqueda de afinidad en el problema del APC}
+\resultados{BL-mut2}{Resultados obtenidos por el algoritmo de búsqueda local con el operador alternativo de mutación en el problema del APC}
+\resultados{BL-ord}{Resultados obtenidos por el algoritmo de búsqueda local ordenando los atributos en el problema del APC}
+\resultados{BL-ord-mut2}{Resultados obtenidos por el algoritmo de búsqueda local ordenando los atributos y con el operador alternativo de mutación en el problema del APC}
+
+\resultados{AGG-BLX-mut2}{Resultados obtenidos por el algoritmo genético generacional con cruce BLX-03 y el operador de mutación alternativo en el problema del APC}
+\resultados{AGE-BLX-mut2}{Resultados obtenidos por el algoritmo genético estacionario con cruce BLX-03 y el operador de mutación alternativo en el problema del APC}
+\resultados{AGE-CA-ALT}{Resultados obtenidos por el algoritmo genético estacionario con cruce aritmético alternativo en el problema del APC}
+\resultados{AM-(10,0.1)}{Resultados obtenidos por el algoritmo memético (10,0.1) usando búsqueda local por afinidad en el problema del APC}
+
+\resultados{tabla-global}{Resultados globales en el problema del APC}
+
+En los problemas de tamaño mayor, los algoritmos genéticos no llegan a competir con la búsqueda local desde posición inicial aleatoria, aunque en \texttt{parkinsons} quedan por encima. Probablemente no consiguen explorar adecuadamente el entorno, mientras que, como es de esperar en algoritmos genéticos simples, no están diseñados para una búsqueda intensificada y la búsqueda local lo hace mejor. Tal vez los operadores de cruce impiden tener suficiente variabilidad, o es neceario incrementar la tasa de mutación; en cualquier caso, seguramente se necesitan mecanismos que mantengan variabilidad en la población. \\
+
+Los algoritmos meméticos consiguen mejorar los resultados de los genéticos, probablemente porque sí consiguen una explotación adecuada, aunque los resultados no son superiores a los de la búsqueda local en el problema de mayor tamaño, debido posiblemente a que la búsqueda local necesita más iteraciones que las fijadas para conseguir llegar a un óptimo local. \\
+
+El tiempo de ejecución en todos los algoritmos genéticos y meméticos es aproximadamente el mismo porque el principal componente de recursos temporales es el número de evaluaciones de la función objetivo. Se aprecia un tiempo de ejecución mayor en AM-(10,1.0) porque probablemente se hagan bastante más de $15\,000$ evaluaciones debido a que solo se comprueba si se ha excedido el número de evaluaciones al final de una generación. El tiempo de ejecución es considerablemente mayor que el de la búsqueda local porque esta converge antes de las $15\,000$ evaluaciones a un óptimo local. \\
+
+Los algoritmos genéticos alternativos consiguen mejorar en general los resultados de su equivalente pedido en el guion. El operador de mutación alternativo consigue tasas de reducción consistentemente más bajas sin reducir la tasa de clasificación, y lo mismo ocurre con el operador de cruce aritmético alternativo. \\
+
+El éxito de los algoritmos meméticos queda eclipsado por los procedimientos que combinan RELIEF con una búsqueda local, que siguen dando mejores resultados al estar especialmente diseñados para aumentar la tasa de reducción en este problema. El algoritmo memético que utiliza búsqueda local por afinidad sí consigue quedar por encima de estos procedimientos (con una notable media de puntuación agregada de $85$ en el problema grande \texttt{ozone-320}).
+
+\end{document}
