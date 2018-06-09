@@ -1,6 +1,6 @@
 [package]
 name = "Prácticas"
-version = "0.1.0"
+version = "1.0.0"
 authors = ["José Manuel Muñoz Fuentes <jmlosvillares@correo.ugr.es>"]
 
 [dependencies]
@@ -9,7 +9,7 @@ ordered-float = "0.5.0"
 rand = "0.4.2"
 time = "*"
 clap = "2.31.2"
-byteorder = "1.2.2"
+byteorder = "1.2.3"
 
 [profile.release]
 lto = true
@@ -21,3 +21,7 @@ path = "src/practica1.rs"
 [[bin]]
 name = "practica2"
 path = "src/practica2.rs"
+
+[[bin]]
+name = "practica3"
+path = "src/practica3.rs"

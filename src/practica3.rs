@@ -6,12 +6,12 @@ extern crate byteorder;     // Permite interpretar arrays de 8 bits como de 64 b
 
 mod knn;                    // Implementa el clasificador K-NN
 mod evaluacion_pesos;       // Contiene las funciones para evaluar los distintos algoritmos
-mod funciones_practica1;    // Recuperamos la búsqueda local y las funciones de combinación de algoritmos
-mod funciones_practica2;    // Funciones implementadas para la práctica 2
+mod funciones_practica1;
+mod funciones_practica3;
 
 use byteorder::{ByteOrder, BigEndian};
-use funciones_practica2::*;   // Usamos todas las funciones implementadas para la práctica 2, lógicamente
-use funciones_practica1::*;   // Volvemos a evaluar algunos algoritmos de la práctica 1
+use funciones_practica3::*;   // Usamos todas las funciones implementadas para la práctica 3, lógicamente
+use funciones_practica1::*;
 
 
 
@@ -26,24 +26,19 @@ fn test(archivo: &str, semilla: &[u64]) {
     let lista_algoritmos: Vec<(fn(&[knn::Dato], &mut _) -> Vec<f64>, &str)> = vec![
             (uno_nn, "1NN"),
             (relief, "RELIEF"),
-            (busqueda_local, "Búsqueda local"),
-            (agg_blx, "AGG_BLX"),
-            (agg_ca, "AGG_CA"),
-            (age_blx, "AGE_BLX"),
-            (age_ca, "AGE_CA"),
-            (am_a, "AM-(10,1.0)"),
-            (am_b, "AM-(10,0.1)"),
-            (am_c, "AM-(10,0.1mej)"),
+            (es, "Enfriamiento simulado"),
+            (ils, "ILS"),
+            (de_rand_1, "DE/rand/1"),
+            (de_ctb_1, "DE/current-to-best/1"),
             (relief_truncado, "RELIEF + truncado"),
             (relief_potencia, "RELIEF + potencia"),
             (relief_afinidad, "RELIEF + afinidad"),
-            (busqueda_local_mut2, "BL con otra mutación"),
-            (busqueda_local_orden, "BL con orden"),
-            (busqueda_local_orden_mut2, "BL con orden y otra mutación"),
-            (agg_blx_mut2, "AGG_BLX_MUT2"),
-            (age_blx_mut2, "AGE_BLX_MUT2"),
-            (age_ca_alt, "AGE_CA_ALT"),
-            (am_afinidad_01, "AM-(10,0.1,af)")
+            (es_mut2, "ES_mut2"),
+            (es_prop, "ES_prop"),
+            (es_prop_mut2, "ES_prop_mut2"),
+            (ils_mut2, "ILS_mut2"),
+            (ils_afinidad, "ILS_afinidad"),
+            (ils_afinidad_relief, "ILS_afinidad_relief")
         ];
     for algoritmo in &lista_algoritmos {
         println!("\n{} sobre los datos en {}...", algoritmo.1, archivo);
@@ -57,7 +52,7 @@ fn main() {
     // Gestor de argumentos
     let matches = clap_app!(practica1 =>
         (author: crate_authors!())
-        (about: "Implementación de la práctica 2\n\nPrueba los algoritmos pedidos con el archivo de datos indicado, utilizando una semilla que se obtiene a partir de una cadena de texto.\n\nLa semilla se inicializa al mismo valor antes de ejecutar cada uno de los algoritmos.")
+        (about: "Implementación de la práctica 3\n\nPrueba los algoritmos pedidos con el archivo de datos indicado, utilizando una semilla que se obtiene a partir de una cadena de texto.\n\nLa semilla se inicializa al mismo valor antes de ejecutar cada uno de los algoritmos.")
         (set_term_width: 79)
         (@arg INPUT: "Archivo .arff con los datos de entrada. Si no se indica se efectúa con los tres archivos indicados en la práctica")
         (@arg semilla: -s --seed +takes_value "Texto del que obtener la semilla para el PRNG. Puede necesitar comillas si contiene espacios")
