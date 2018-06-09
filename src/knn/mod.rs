@@ -66,6 +66,10 @@ impl Dato {
         self.atributos_f.len() + self.atributos_c.len()
     }
 
+    pub fn solo_flotantes(&self) -> bool {
+        self.atributos_c.len() == 0
+    }
+
     pub fn id_categoria(&self) -> i32 {
         self.id_categoria
     }
@@ -131,6 +135,27 @@ pub fn get_mas_cercano(vm: &[Dato], d: &Dato, w: &[f64]) -> i32 {
 pub fn get_mas_cercano_distinto(vm: &[Dato], d: &Dato, w: &[f64]) -> i32 {
     vm.iter().min_by_key(
         |x| OrderedFloat(if ptr::eq(*x, d) { INFINITY } else { distancia_cuadrado(x, d, w) })
+      ).unwrap().id_categoria
+}
+
+
+// Distancia (al cuadrado) entre las características de dos datos de valores flotantes
+fn distancia_cuadrado_solo_f(a: &Dato, b: &Dato, w: &[f64]) -> f64 {
+    let num_flotantes = a.atributos_f.len();
+    distancia_cuadrado_vf(&a.atributos_f, &b.atributos_f, &w[0..num_flotantes])
+}
+
+// Obtiene la categoría del dato más cercano a uno dado cuando los valores son flotantes
+// No comprueba que el dato a clasificar no esté en la muestra de entrenamiento:
+//   si lo está se dará el propio dato
+pub fn get_mas_cercano_f(vm: &[Dato], d: &Dato, w: &[f64]) -> i32 {
+    vm.iter().min_by_key(|x| OrderedFloat(distancia_cuadrado_solo_f(x, d, w))).unwrap().id_categoria
+}
+
+// Obtiene la categoría del dato más cercano a uno dado que no es él mismo cuando los valores son flotantes
+pub fn get_mas_cercano_distinto_f(vm: &[Dato], d: &Dato, w: &[f64]) -> i32 {
+    vm.iter().min_by_key(
+        |x| OrderedFloat(if ptr::eq(*x, d) { INFINITY } else { distancia_cuadrado_solo_f(x, d, w) })
       ).unwrap().id_categoria
 }
 

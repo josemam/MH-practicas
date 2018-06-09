@@ -33,22 +33,17 @@ pub fn get_datos_de_clase<'a>(vm: &[&'a Dato], id: i32) -> Vec<&'a Dato> {
 // Asume que los pesos están normalizados: el máximo es 1
 fn evaluar_clasificacion(entrenamiento: &[Dato], test: &[Dato], w: &[f64]) -> f64 {
     let instancias_test = test.len();
-    let mut bien_clasificadas: i32 = 0;
 
     // Escoge el clasificador con leave-one-out si el conjunto de entrenamiento y el de prueba coinciden
-    let clasificador =
-        if (entrenamiento as *const _, entrenamiento.len()) == (test as *const _, test.len()) {
-            knn::get_mas_cercano_distinto
-        } else {
-            knn::get_mas_cercano
-        };
+    let clasificador = match ((entrenamiento as *const _, entrenamiento.len()) == (test as *const _, test.len()), entrenamiento[0].solo_flotantes()) {
+        (true,  true ) => knn::get_mas_cercano_distinto_f,
+        (true,  false) => knn::get_mas_cercano_distinto,
+        (false, true ) => knn::get_mas_cercano_f,
+        (false, false) => knn::get_mas_cercano,
+    };
 
-    // Clasifica los datos del conjunto de prueba y comprueba si se coincide con su clase correcta
-    for dato in test {
-        if clasificador(&entrenamiento, &dato, &w) == dato.id_categoria() {
-            bien_clasificadas += 1;
-        }
-    }
+    // Clasifica los datos del conjunto de prueba y cuenta cuántos coinciden con su clase correcta
+    let bien_clasificadas = test.iter().filter(|dato| clasificador(&entrenamiento, &dato, &w) == dato.id_categoria()).count();
 
     100.0 * (bien_clasificadas as f64) / (instancias_test as f64)
 }
